@@ -25,5 +25,11 @@ spring:
       host: localhost
       port: 6379
 
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expirationMs: ${JWT_EXPIRATION}
+    refreshExpirationMs: ${JWT_REFRESH_EXPIRATION}
+
 server:
   port: 8080
