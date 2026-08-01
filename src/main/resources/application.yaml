@@ -1,3 +1,29 @@
 spring:
   application:
-    name: backend
+    name: smartrecipe-backend
+  
+  # Database Configuration (Chạy trực tiếp ở local sẽ gọi vào port 3306 của Docker)
+  datasource:
+    url: jdbc:mysql://localhost:3306/smart_recipe_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA & Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: validate # Chỉ kiểm tra schema vì CSDL đã được script init_database.sql tạo tự động
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+server:
+  port: 8080
