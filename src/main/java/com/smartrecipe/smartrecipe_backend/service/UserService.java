@@ -1,0 +1,11 @@
+package com.smartrecipe.smartrecipe_backend.service;
+
+import com.smartrecipe.smartrecipe_backend.dto.request.ChangePasswordRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.UpdateProfileRequest;
+import com.smartrecipe.smartrecipe_backend.dto.response.UserProfileResponse;
+
+public interface UserService {
+    UserProfileResponse getUserProfile(String username);
+    UserProfileResponse updateProfile(String username, UpdateProfileRequest request);
+    void changePassword(String username, ChangePasswordRequest request);
+}
