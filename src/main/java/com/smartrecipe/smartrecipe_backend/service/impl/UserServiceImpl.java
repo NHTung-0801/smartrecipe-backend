@@ -18,6 +18,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.smartrecipe.smartrecipe_backend.service.CloudinaryService cloudinaryService;
 
     private User getUserByUsername(String username) {
         return userRepository.findByUsername(username)
@@ -68,5 +69,16 @@ public class UserServiceImpl implements UserService {
         
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Override
+    public UserProfileResponse updateAvatar(String username, org.springframework.web.multipart.MultipartFile file) {
+        User user = getUserByUsername(username);
+        
+        String avatarUrl = cloudinaryService.uploadImage(file, "smartrecipe/avatars");
+        user.setAvatarUrl(avatarUrl);
+        User updatedUser = userRepository.save(user);
+        
+        return mapToResponse(updatedUser);
     }
 }

@@ -42,4 +42,13 @@ public class UserController {
         userService.changePassword(username, request);
         return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
+
+    @PostMapping(value = "/avatar", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateAvatar(
+            Authentication authentication,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        String username = authentication.getName();
+        UserProfileResponse updatedProfile = userService.updateAvatar(username, file);
+        return ResponseEntity.ok(ApiResponse.success(updatedProfile, "Cập nhật ảnh đại diện thành công"));
+    }
 }
