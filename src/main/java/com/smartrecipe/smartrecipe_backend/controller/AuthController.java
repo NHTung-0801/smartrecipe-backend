@@ -1,6 +1,7 @@
 package com.smartrecipe.smartrecipe_backend.controller;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.LoginRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.RefreshTokenRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RegisterRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.AuthResponse;
@@ -9,7 +10,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -28,5 +32,18 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse authResponse = authService.login(loginRequest);
         return ResponseEntity.ok(ApiResponse.success(authResponse, "Đăng nhập thành công!"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthResponse authResponse = authService.refreshToken(request);
+        return ResponseEntity.ok(ApiResponse.success(authResponse, "Làm mới token thành công!"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(Authentication authentication) {
+        String username = authentication.getName();
+        authService.logout(username);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất thành công!"));
     }
 }

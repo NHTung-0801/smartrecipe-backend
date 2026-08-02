@@ -1,10 +1,12 @@
 package com.smartrecipe.smartrecipe_backend.service.impl;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.LoginRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.RefreshTokenRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RegisterRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.AuthResponse;
 import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.enums.Role;
+import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.DuplicateResourceException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
@@ -15,6 +17,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -75,5 +78,47 @@ public class AuthServiceImpl implements AuthService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .build();
+    }
+
+    @Override
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+
+        // Xác thực refresh token
+        if (!jwtProvider.validateJwtToken(refreshToken)) {
+            throw new BadRequestException("Refresh token không hợp lệ hoặc đã hết hạn");
+        }
+
+        // Lấy username từ refresh token
+        String username = jwtProvider.getUserNameFromJwtToken(refreshToken);
+
+        // Kiểm tra user có tồn tại không
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy User"));
+
+        // Sinh cặp token mới
+        String newAccessToken = jwtProvider.generateTokenFromUsername(username);
+        String newRefreshToken = jwtProvider.generateRefreshToken(username);
+
+        return AuthResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .build();
+    }
+
+    @Override
+    public void logout(String username) {
+        // Kiểm tra user có tồn tại không
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy User"));
+
+        // Xóa SecurityContext
+        SecurityContextHolder.clearContext();
+
+        // TODO: Sau này tích hợp Redis — thêm refresh token vào blacklist
     }
 }
