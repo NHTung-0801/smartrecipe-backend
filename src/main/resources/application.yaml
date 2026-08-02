@@ -12,7 +12,7 @@ spring:
   # JPA & Hibernate
   jpa:
     hibernate:
-      ddl-auto: validate # Chỉ kiểm tra schema vì CSDL đã được script init_database.sql tạo tự động
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -27,9 +27,9 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
-    expirationMs: ${JWT_EXPIRATION}
-    refreshExpirationMs: ${JWT_REFRESH_EXPIRATION}
+    secret: ${JWT_SECRET:U21hcnRSZWNpcGVfU3VwZXJTZWNyZXRLZXlfMjAyNl8xMjM0NTY3ODkw}
+    expirationMs: ${JWT_EXPIRATION:86400000}
+    refreshExpirationMs: ${JWT_REFRESH_EXPIRATION:604800000}
 
 server:
   port: 8080
