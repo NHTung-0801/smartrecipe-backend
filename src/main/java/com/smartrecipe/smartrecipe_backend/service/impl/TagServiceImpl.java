@@ -24,6 +24,7 @@ public class TagServiceImpl implements TagService {
 
     @Override
     @Cacheable("tags")
+    @Transactional(readOnly = true)
     public List<TagResponse> getAllTags() {
         return tagRepository.findAll()
                 .stream()
@@ -33,6 +34,7 @@ public class TagServiceImpl implements TagService {
 
     @Override
     @Cacheable(value = "tag", key = "#id")
+    @Transactional(readOnly = true)
     public TagResponse getTagById(Integer id) {
         Tag tag = tagRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tag với ID: " + id));
@@ -48,6 +50,24 @@ public class TagServiceImpl implements TagService {
         Tag tag = Tag.builder()
                 .name(name)
                 .build();
+        Tag saved = tagRepository.save(tag);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @CacheEvict(value = {"tags", "tag"}, allEntries = true)
+    public TagResponse updateTag(Integer id, String name) {
+        Tag tag = tagRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tag với ID: " + id));
+
+        // Kiểm tra tên mới có trùng với tag khác không
+        tagRepository.findByName(name).ifPresent(existing -> {
+            if (!existing.getId().equals(id)) {
+                throw new DuplicateResourceException("Tag \"" + name + "\" đã tồn tại");
+            }
+        });
+
+        tag.setName(name);
         Tag saved = tagRepository.save(tag);
         return mapToResponse(saved);
     }

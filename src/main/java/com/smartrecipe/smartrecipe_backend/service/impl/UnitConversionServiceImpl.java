@@ -27,6 +27,7 @@ public class UnitConversionServiceImpl implements UnitConversionService {
 
     @Override
     @Cacheable("unit_conversions")
+    @Transactional(readOnly = true)
     public List<UnitConversionResponse> getAllConversions() {
         return unitConversionRepository.findAll()
                 .stream()
@@ -36,6 +37,7 @@ public class UnitConversionServiceImpl implements UnitConversionService {
 
     @Override
     @Cacheable(value = "unit_conversions_by_ingredient", key = "#ingredientId")
+    @Transactional(readOnly = true)
     public List<UnitConversionResponse> getConversionsByIngredient(Long ingredientId) {
         return unitConversionRepository.findByIngredientId(ingredientId)
                 .stream()
@@ -45,6 +47,7 @@ public class UnitConversionServiceImpl implements UnitConversionService {
 
     @Override
     @Cacheable("unit_conversions_generic")
+    @Transactional(readOnly = true)
     public List<UnitConversionResponse> getGenericConversions() {
         return unitConversionRepository.findByIngredientIsNull()
                 .stream()

@@ -23,6 +23,7 @@ public class AisleServiceImpl implements AisleService {
 
     @Override
     @Cacheable("aisles")
+    @Transactional(readOnly = true)
     public List<AisleResponse> getAllAisles() {
         return aisleRepository.findAll()
                 .stream()
@@ -32,6 +33,7 @@ public class AisleServiceImpl implements AisleService {
 
     @Override
     @Cacheable(value = "aisle", key = "#id")
+    @Transactional(readOnly = true)
     public AisleResponse getAisleById(Integer id) {
         Aisle aisle = aisleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quầy hàng với ID: " + id));

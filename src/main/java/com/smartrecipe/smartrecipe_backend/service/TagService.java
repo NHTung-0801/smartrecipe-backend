@@ -8,5 +8,6 @@ public interface TagService {
     List<TagResponse> getAllTags();
     TagResponse getTagById(Integer id);
     TagResponse createTag(String name);
+    TagResponse updateTag(Integer id, String name);
     void deleteTag(Integer id);
 }

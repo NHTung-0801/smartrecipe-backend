@@ -1,8 +1,10 @@
 package com.smartrecipe.smartrecipe_backend.controller;
 
+import com.smartrecipe.smartrecipe_backend.dto.request.TagRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.TagResponse;
 import com.smartrecipe.smartrecipe_backend.service.TagService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/tags")
@@ -32,11 +33,16 @@ public class TagController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<TagResponse>> createTag(@RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        TagResponse tag = tagService.createTag(name);
+    public ResponseEntity<ApiResponse<TagResponse>> createTag(@Valid @RequestBody TagRequest request) {
+        TagResponse tag = tagService.createTag(request.getName());
         return new ResponseEntity<>(ApiResponse.success(tag, "Tạo tag thành công!"), HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TagResponse>> updateTag(@PathVariable Integer id, @Valid @RequestBody TagRequest request) {
+        TagResponse tag = tagService.updateTag(id, request.getName());
+        return ResponseEntity.ok(ApiResponse.success(tag, "Cập nhật tag thành công!"));
     }
 
     @DeleteMapping("/{id}")

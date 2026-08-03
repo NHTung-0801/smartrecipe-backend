@@ -29,7 +29,7 @@ public class IngredientServiceImpl implements IngredientService {
     private final AisleRepository aisleRepository;
 
     @Override
-    @Cacheable(value = "ingredients_page", key = "#pageable.pageNumber + '_' + #pageable.pageSize")
+    @Transactional(readOnly = true)
     public Page<IngredientResponse> getAllIngredients(Pageable pageable) {
         return ingredientRepository.findAll(pageable)
                 .map(this::mapToResponse);
@@ -37,6 +37,7 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     @Cacheable(value = "ingredients_search", key = "#keyword")
+    @Transactional(readOnly = true)
     public List<IngredientResponse> searchIngredients(String keyword) {
         return ingredientRepository.findByNameContainingIgnoreCase(keyword)
                 .stream()
@@ -46,6 +47,7 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     @Cacheable(value = "ingredients_by_aisle", key = "#aisleId")
+    @Transactional(readOnly = true)
     public List<IngredientResponse> getIngredientsByAisle(Integer aisleId) {
         return ingredientRepository.findByAisleId(aisleId)
                 .stream()
@@ -55,6 +57,7 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     @Cacheable(value = "ingredient", key = "#id")
+    @Transactional(readOnly = true)
     public IngredientResponse getIngredientById(Long id) {
         Ingredient ingredient = ingredientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + id));
@@ -62,7 +65,7 @@ public class IngredientServiceImpl implements IngredientService {
     }
 
     @Override
-    @CacheEvict(value = {"ingredients_page", "ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
+    @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
     public IngredientResponse createIngredient(IngredientRequest request) {
         Ingredient ingredient = Ingredient.builder()
                 .name(request.getName())
@@ -84,7 +87,7 @@ public class IngredientServiceImpl implements IngredientService {
     }
 
     @Override
-    @CacheEvict(value = {"ingredients_page", "ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
+    @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
     public IngredientResponse updateIngredient(Long id, IngredientRequest request) {
         Ingredient ingredient = ingredientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + id));
@@ -109,7 +112,7 @@ public class IngredientServiceImpl implements IngredientService {
     }
 
     @Override
-    @CacheEvict(value = {"ingredients_page", "ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
+    @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
     public void deleteIngredient(Long id) {
         if (!ingredientRepository.existsById(id)) {
             throw new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + id);

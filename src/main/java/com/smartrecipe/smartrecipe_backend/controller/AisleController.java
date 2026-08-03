@@ -1,8 +1,10 @@
 package com.smartrecipe.smartrecipe_backend.controller;
 
+import com.smartrecipe.smartrecipe_backend.dto.request.AisleRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.AisleResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.service.AisleService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/aisles")
@@ -33,17 +34,15 @@ public class AisleController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<AisleResponse>> createAisle(@RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        AisleResponse aisle = aisleService.createAisle(name);
+    public ResponseEntity<ApiResponse<AisleResponse>> createAisle(@Valid @RequestBody AisleRequest request) {
+        AisleResponse aisle = aisleService.createAisle(request.getName());
         return new ResponseEntity<>(ApiResponse.success(aisle, "Tạo quầy hàng thành công!"), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<AisleResponse>> updateAisle(@PathVariable Integer id, @RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        AisleResponse aisle = aisleService.updateAisle(id, name);
+    public ResponseEntity<ApiResponse<AisleResponse>> updateAisle(@PathVariable Integer id, @Valid @RequestBody AisleRequest request) {
+        AisleResponse aisle = aisleService.updateAisle(id, request.getName());
         return ResponseEntity.ok(ApiResponse.success(aisle, "Cập nhật quầy hàng thành công!"));
     }
 

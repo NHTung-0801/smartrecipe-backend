@@ -50,7 +50,6 @@ public class IngredientController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<IngredientResponse>> createIngredient(@Valid @RequestBody IngredientRequest request) {
         IngredientResponse ingredient = ingredientService.createIngredient(request);
         return new ResponseEntity<>(ApiResponse.success(ingredient, "Tạo nguyên liệu thành công!"), HttpStatus.CREATED);
