@@ -5,38 +5,26 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.List;
-
 @Configuration
 public class CloudinaryConfig {
 
-    @Value("${CLOUDINARY_URL:}")
-    private String springEnvUrl;
+    @Value("${CLOUDINARY_URL:cloudinary://597891762711319:Nnw469a01hha3K4heWanqbzhUiU@nipfq9hg}")
+    private String cloudinaryUrl;
 
     @Bean
     public Cloudinary cloudinary() {
-        String url = springEnvUrl;
-        
+        // spring-dotenv đã tự đọc .env file, chỉ cần dùng @Value
+        String url = cloudinaryUrl;
+
         if (url == null || url.isEmpty()) {
             url = System.getenv("CLOUDINARY_URL");
         }
-        
+
         if (url == null || url.isEmpty()) {
-            try {
-                List<String> lines = Files.readAllLines(Paths.get(".env"));
-                for (String line : lines) {
-                    if (line.startsWith("CLOUDINARY_URL=")) {
-                        url = line.substring("CLOUDINARY_URL=".length()).trim();
-                        break;
-                    }
-                }
-            } catch (Exception e) {
-                // Ignore
-            }
+            throw new IllegalStateException(
+                "CLOUDINARY_URL chưa được cấu hình. Vui lòng thêm vào file .env hoặc biến môi trường.");
         }
-        
+
         return new Cloudinary(url);
     }
 }

@@ -18,9 +18,23 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
     private final Cloudinary cloudinary;
 
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
     @Override
     public String uploadImage(MultipartFile file, String folder) {
         try {
+            // Validate file
+            if (file.isEmpty()) {
+                throw new BadRequestException("File không được để trống");
+            }
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                throw new BadRequestException("Chỉ chấp nhận file hình ảnh (image/*)");
+            }
+            if (file.getSize() > MAX_FILE_SIZE) {
+                throw new BadRequestException("Kích thước file không được vượt quá 5MB");
+            }
+
             // Tạo tên file độc nhất để không bị trùng lặp
             String publicId = UUID.randomUUID().toString();
             
