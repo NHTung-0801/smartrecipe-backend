@@ -8,6 +8,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -65,4 +67,32 @@ public class Recipe {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // ======== One-to-Many collections ========
+
+    @Builder.Default
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeStep> steps = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeIngredient> ingredients = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeTag> tags = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeLike> likes = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "recipe", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RecipeComment> comments = new ArrayList<>();
+
+    // ======== Helper ========
+
+    public Long getClonedFromId() {
+        return clonedFrom != null ? clonedFrom.getId() : null;
+    }
 }
