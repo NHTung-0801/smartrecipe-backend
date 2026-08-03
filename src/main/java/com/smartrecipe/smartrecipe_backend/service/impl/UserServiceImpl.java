@@ -7,16 +7,23 @@ import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
+import com.smartrecipe.smartrecipe_backend.repository.FollowRepository;
+import com.smartrecipe.smartrecipe_backend.repository.RecipeRepository;
+import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
 import com.smartrecipe.smartrecipe_backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final FollowRepository followRepository;
+    private final RecipeRepository recipeRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.smartrecipe.smartrecipe_backend.service.CloudinaryService cloudinaryService;
 
@@ -25,7 +32,29 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
     }
 
-    private UserProfileResponse mapToResponse(User user) {
+    private UserProfileResponse mapToResponse(User user, String currentUsername) {
+        long followerCount = followRepository.countByFollowingId(user.getId());
+        long followingCount = followRepository.countByFollowerId(user.getId());
+        
+        long recipeCount = 0;
+        boolean isFollowing = false;
+        
+        if (currentUsername != null && currentUsername.equals(user.getUsername())) {
+            // Xem profile của chính mình: đếm tất cả công thức (trừ DELETED)
+            recipeCount = recipeRepository.countByAuthorIdAndStatusNot(user.getId(), RecipeStatus.DELETED);
+        } else {
+            // Xem profile người khác: chỉ đếm công thức PUBLIC
+            recipeCount = recipeRepository.countByAuthorIdAndStatus(user.getId(), RecipeStatus.PUBLIC);
+            
+            // Kiểm tra xem currentUsername đã follow user này chưa
+            if (currentUsername != null) {
+                User currentUser = userRepository.findByUsername(currentUsername).orElse(null);
+                if (currentUser != null) {
+                    isFollowing = followRepository.existsByFollowerIdAndFollowingId(currentUser.getId(), user.getId());
+                }
+            }
+        }
+
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -33,15 +62,28 @@ public class UserServiceImpl implements UserService {
                 .displayName(user.getDisplayName())
                 .avatarUrl(user.getAvatarUrl())
                 .bio(user.getBio())
+                .recipeCount((int) recipeCount)
+                .followerCount(followerCount)
+                .followingCount(followingCount)
+                .isFollowing(isFollowing)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(String username) {
         User user = getUserByUsername(username);
-        return mapToResponse(user);
+        return mapToResponse(user, username);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileResponse getPublicUserProfile(Long userId, String currentUsername) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        return mapToResponse(user, currentUsername);
     }
 
     @Override
@@ -56,7 +98,7 @@ public class UserServiceImpl implements UserService {
         }
         
         User updatedUser = userRepository.save(user);
-        return mapToResponse(updatedUser);
+        return mapToResponse(updatedUser, username);
     }
 
     @Override
@@ -79,6 +121,6 @@ public class UserServiceImpl implements UserService {
         user.setAvatarUrl(avatarUrl);
         User updatedUser = userRepository.save(user);
         
-        return mapToResponse(updatedUser);
+        return mapToResponse(updatedUser, username);
     }
 }

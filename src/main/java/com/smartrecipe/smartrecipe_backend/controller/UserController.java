@@ -12,20 +12,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/users/me")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
 
-    @GetMapping
+    @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(Authentication authentication) {
         String username = authentication.getName();
         UserProfileResponse profile = userService.getUserProfile(username);
         return ResponseEntity.ok(ApiResponse.success(profile, "Lấy thông tin hồ sơ thành công"));
     }
 
-    @PutMapping
+    @PutMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateMyProfile(
             Authentication authentication, 
             @Valid @RequestBody UpdateProfileRequest request) {
@@ -34,7 +34,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(updatedProfile, "Cập nhật hồ sơ thành công"));
     }
 
-    @PutMapping("/password")
+    @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             Authentication authentication, 
             @Valid @RequestBody ChangePasswordRequest request) {
@@ -43,12 +43,21 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
 
-    @PostMapping(value = "/avatar", consumes = "multipart/form-data")
+    @PostMapping(value = "/me/avatar", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateAvatar(
             Authentication authentication,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         String username = authentication.getName();
         UserProfileResponse updatedProfile = userService.updateAvatar(username, file);
         return ResponseEntity.ok(ApiResponse.success(updatedProfile, "Cập nhật ảnh đại diện thành công"));
+    }
+
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getPublicProfile(
+            @PathVariable Long id,
+            Authentication authentication) {
+        String currentUsername = authentication != null ? authentication.getName() : null;
+        UserProfileResponse profile = userService.getPublicUserProfile(id, currentUsername);
+        return ResponseEntity.ok(ApiResponse.success(profile, "Lấy thông tin hồ sơ thành công"));
     }
 }
