@@ -7,6 +7,7 @@ import com.smartrecipe.smartrecipe_backend.dto.response.RecipeResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeSummaryResponse;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
+import com.smartrecipe.smartrecipe_backend.service.RecipeExportService;
 import com.smartrecipe.smartrecipe_backend.service.RecipeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.security.Principal;
 public class RecipeController {
 
     private final RecipeService recipeService;
+    private final RecipeExportService recipeExportService;
     private final UserRepository userRepository;
 
     /**
@@ -70,6 +72,28 @@ public class RecipeController {
         Long userId = getUserId(principal);
         recipeService.deleteRecipe(id, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<RecipeResponse> changeRecipeStatus(
+            @PathVariable Long id,
+            @RequestParam com.smartrecipe.smartrecipe_backend.enums.RecipeStatus status,
+            Principal principal) {
+        Long userId = getUserId(principal);
+        RecipeResponse response = recipeService.changeStatus(id, status, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/export/word")
+    public ResponseEntity<byte[]> exportRecipeToWord(@PathVariable Long id) {
+        byte[] docBytes = recipeExportService.exportRecipeToWord(id);
+        
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+        headers.setContentDispositionFormData("attachment", "recipe_" + id + ".docx");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+        
+        return new ResponseEntity<>(docBytes, headers, HttpStatus.OK);
     }
 
     // ==================== LISTING & SEARCH ====================

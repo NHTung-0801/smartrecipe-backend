@@ -39,14 +39,12 @@ public class TagController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<TagResponse>> updateTag(@PathVariable Integer id, @Valid @RequestBody TagRequest request) {
         TagResponse tag = tagService.updateTag(id, request.getName());
         return ResponseEntity.ok(ApiResponse.success(tag, "Cập nhật tag thành công!"));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteTag(@PathVariable Integer id) {
         tagService.deleteTag(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Xóa tag thành công!"));
