@@ -3,6 +3,7 @@ package com.smartrecipe.smartrecipe_backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -11,7 +12,7 @@ import java.math.BigDecimal;
 @Builder
 @Entity
 @Table(name = "user_pantry", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "ingredient_id"})
+        @UniqueConstraint(columnNames = { "user_id", "ingredient_id" })
 })
 public class UserPantry {
     @Id
@@ -31,4 +32,7 @@ public class UserPantry {
 
     @Column(name = "low_stock_threshold", precision = 10, scale = 2)
     private BigDecimal lowStockThreshold;
+
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
 }
