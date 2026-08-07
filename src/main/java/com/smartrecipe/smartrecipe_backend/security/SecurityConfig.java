@@ -3,6 +3,7 @@ package com.smartrecipe.smartrecipe_backend.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -57,6 +58,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/api/v1/public/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/public").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/search").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/user/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}/export/word").permitAll()
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
             );
