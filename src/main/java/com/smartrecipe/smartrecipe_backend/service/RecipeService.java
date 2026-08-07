@@ -19,6 +19,8 @@ public interface RecipeService {
 
     void deleteRecipe(Long id, Long userId);
 
+    RecipeResponse changeStatus(Long id, com.smartrecipe.smartrecipe_backend.enums.RecipeStatus status, Long userId);
+
     // My Recipes (Draft & Public, exclude DELETED)
     Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size);
 

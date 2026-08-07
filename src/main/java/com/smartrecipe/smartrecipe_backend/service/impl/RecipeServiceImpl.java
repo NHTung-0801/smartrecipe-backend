@@ -191,7 +191,22 @@ public class RecipeServiceImpl implements RecipeService {
         recipeRepository.save(recipe);
     }
 
-    // ==================== LISTING ====================
+    @Override
+    @Transactional
+    public RecipeResponse changeStatus(Long id, com.smartrecipe.smartrecipe_backend.enums.RecipeStatus status, Long userId) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công thức với ID: " + id));
+
+        if (!recipe.getAuthor().getId().equals(userId)) {
+            throw new RuntimeException("Bạn không có quyền thay đổi trạng thái công thức này");
+        }
+
+        recipe.setStatus(status);
+        recipe = recipeRepository.save(recipe);
+        return mapToDetailResponse(recipe);
+    }
+
+    // ==================== LISTING & SEARCH ====================
 
     @Override
     @Transactional(readOnly = true)

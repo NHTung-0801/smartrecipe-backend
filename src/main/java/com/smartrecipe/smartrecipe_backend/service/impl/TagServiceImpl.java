@@ -4,6 +4,7 @@ import com.smartrecipe.smartrecipe_backend.dto.response.TagResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Tag;
 import com.smartrecipe.smartrecipe_backend.exception.DuplicateResourceException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
+import com.smartrecipe.smartrecipe_backend.repository.RecipeTagRepository;
 import com.smartrecipe.smartrecipe_backend.repository.TagRepository;
 import com.smartrecipe.smartrecipe_backend.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class TagServiceImpl implements TagService {
 
     private final TagRepository tagRepository;
+    private final RecipeTagRepository recipeTagRepository;
 
     @Override
     @Cacheable("tags")
@@ -78,6 +80,7 @@ public class TagServiceImpl implements TagService {
         if (!tagRepository.existsById(id)) {
             throw new ResourceNotFoundException("Không tìm thấy tag với ID: " + id);
         }
+        recipeTagRepository.deleteByTagId(id);
         tagRepository.deleteById(id);
     }
 
