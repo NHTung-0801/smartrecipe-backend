@@ -4,10 +4,12 @@ spring:
   
   # Database Configuration (Chạy trực tiếp ở local sẽ gọi vào port 3306 của Docker)
   datasource:
-    url: jdbc:mysql://localhost:3306/smart_recipe_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: "jdbc:mysql://localhost:3306/smart_recipe_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: "SET NAMES utf8mb4"
 
   # JPA & Hibernate
   jpa:
@@ -33,3 +35,10 @@ app:
 
 server:
   port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-response: true
+
