@@ -11,8 +11,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "user_pantry", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "user_id", "ingredient_id" })
+@Table(name = "user_pantry", indexes = {
+        @Index(name = "idx_pantry_user_ingredient_expiry", columnList = "user_id,ingredient_id,expiry_date")
 })
 public class UserPantry {
     @Id
@@ -27,10 +27,12 @@ public class UserPantry {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private Ingredient ingredient;
 
-    @Column(name = "quantity_available", nullable = false, precision = 10, scale = 2)
+    /** Số lượng của lot, luôn được lưu theo Ingredient.baseUnit. */
+    @Column(name = "quantity_available", nullable = false, precision = 14, scale = 4)
     private BigDecimal quantityAvailable;
 
-    @Column(name = "low_stock_threshold", precision = 10, scale = 2)
+    /** Ngưỡng theo base unit; giữ trên lot trong giai đoạn tương thích schema. */
+    @Column(name = "low_stock_threshold", precision = 14, scale = 4)
     private BigDecimal lowStockThreshold;
 
     @Column(name = "expiry_date")

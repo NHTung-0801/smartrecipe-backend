@@ -73,15 +73,16 @@ public class PantryController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<PantryResponse>> updateItem(
             @PathVariable Long id,
-            @Valid @RequestBody PantryRequest request) {
-        PantryResponse response = pantryService.updateItem(id, request);
+            @Valid @RequestBody PantryRequest request,
+            Principal principal) {
+        PantryResponse response = pantryService.updateItem(getUserId(principal), id, request);
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật mục pantry thành công!"));
     }
 
     /** DELETE /api/v1/pantry/{id} - Xóa 1 nguyên liệu khỏi tủ */
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> removeItem(@PathVariable Long id) {
-        pantryService.removeItem(id);
+    public ResponseEntity<ApiResponse<Void>> removeItem(@PathVariable Long id, Principal principal) {
+        pantryService.removeItem(getUserId(principal), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa nguyên liệu khỏi tủ!"));
     }
 

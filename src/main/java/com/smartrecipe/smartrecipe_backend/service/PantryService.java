@@ -13,10 +13,10 @@ public interface PantryService {
     PantryResponse addOrUpdateItem(Long userId, PantryRequest request);
 
     /** Cập nhật số lượng/ngưỡng/ngày hết hạn. */
-    PantryResponse updateItem(Long pantryId, PantryRequest request);
+    PantryResponse updateItem(Long userId, Long pantryId, PantryRequest request);
 
     /** Xóa 1 nguyên liệu khỏi tủ. */
-    void removeItem(Long pantryId);
+    void removeItem(Long userId, Long pantryId);
 
     /** Lấy danh sách pantry của user, nhóm theo Aisle. filter: ALL / EXPIRING_SOON / EXPIRED / LOW_STOCK. */
     Map<String, List<PantryResponse>> getMyPantry(Long userId, String filter);

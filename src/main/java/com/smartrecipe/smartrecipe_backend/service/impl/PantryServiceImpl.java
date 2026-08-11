@@ -8,11 +8,13 @@ import com.smartrecipe.smartrecipe_backend.dto.response.PantrySummaryResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Ingredient;
 import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.entity.UserPantry;
+import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.IngredientRepository;
 import com.smartrecipe.smartrecipe_backend.repository.PantryRepository;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.service.PantryService;
+import com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,39 +31,37 @@ public class PantryServiceImpl implements PantryService {
     private final PantryRepository pantryRepository;
     private final IngredientRepository ingredientRepository;
     private final UserRepository userRepository;
+    private final UnitNormalizationService unitNormalizationService;
 
     @Override
     public PantryResponse addOrUpdateItem(Long userId, PantryRequest request) {
-        // Kiểm tra xem nguyên liệu đã có trong tủ chưa
-        Optional<UserPantry> existing = pantryRepository.findByUserIdAndIngredientId(userId, request.getIngredientId());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + request.getIngredientId()));
+        java.math.BigDecimal quantityBase = unitNormalizationService.toBaseUnit(
+                request.getQuantityAvailable(), request.getUnit(), ingredient);
+        java.math.BigDecimal thresholdBase = request.getLowStockThreshold() == null ? null
+                : unitNormalizationService.toBaseUnit(request.getLowStockThreshold(), request.getUnit(), ingredient);
+
+        Optional<UserPantry> existing = findMatchingLot(userId, request.getIngredientId(), request.getExpiryDate());
 
         if (existing.isPresent()) {
-            // Cộng dồn số lượng
             UserPantry pantry = existing.get();
-            pantry.setQuantityAvailable(pantry.getQuantityAvailable().add(request.getQuantityAvailable()));
-            // Cập nhật ngày hết hạn nếu có
-            if (request.getExpiryDate() != null) {
-                pantry.setExpiryDate(request.getExpiryDate());
-            }
-            // Cập nhật ngưỡng nếu có
-            if (request.getLowStockThreshold() != null) {
-                pantry.setLowStockThreshold(request.getLowStockThreshold());
+            pantry.setQuantityAvailable(pantry.getQuantityAvailable().add(quantityBase));
+            if (thresholdBase != null) {
+                updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
+                pantry.setLowStockThreshold(thresholdBase);
             }
             UserPantry saved = pantryRepository.save(pantry);
             return mapToResponse(saved);
         }
 
-        // Thêm mới
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
-        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + request.getIngredientId()));
-
         UserPantry pantry = UserPantry.builder()
                 .user(user)
                 .ingredient(ingredient)
-                .quantityAvailable(request.getQuantityAvailable())
-                .lowStockThreshold(request.getLowStockThreshold())
+                .quantityAvailable(quantityBase)
+                .lowStockThreshold(resolveThreshold(userId, request.getIngredientId(), thresholdBase))
                 .expiryDate(request.getExpiryDate())
                 .build();
 
@@ -70,12 +70,33 @@ public class PantryServiceImpl implements PantryService {
     }
 
     @Override
-    public PantryResponse updateItem(Long pantryId, PantryRequest request) {
-        UserPantry pantry = pantryRepository.findById(pantryId)
+    public PantryResponse updateItem(Long userId, Long pantryId, PantryRequest request) {
+        UserPantry pantry = pantryRepository.findByIdAndUserId(pantryId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy mục pantry với ID: " + pantryId));
 
-        pantry.setQuantityAvailable(request.getQuantityAvailable());
-        pantry.setLowStockThreshold(request.getLowStockThreshold());
+        if (!pantry.getIngredient().getId().equals(request.getIngredientId())) {
+            throw new BadRequestException("Không thể đổi nguyên liệu của một lot pantry");
+        }
+        java.math.BigDecimal quantityBase = unitNormalizationService.toBaseUnit(
+                request.getQuantityAvailable(), request.getUnit(), pantry.getIngredient());
+        java.math.BigDecimal thresholdBase = request.getLowStockThreshold() == null
+                ? pantry.getLowStockThreshold()
+                : unitNormalizationService.toBaseUnit(
+                        request.getLowStockThreshold(), request.getUnit(), pantry.getIngredient());
+
+        Optional<UserPantry> matchingLot = findMatchingLot(userId, request.getIngredientId(), request.getExpiryDate());
+        if (matchingLot.isPresent() && !matchingLot.get().getId().equals(pantryId)) {
+            UserPantry target = matchingLot.get();
+            target.setQuantityAvailable(target.getQuantityAvailable().add(quantityBase));
+            updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
+            target.setLowStockThreshold(thresholdBase);
+            pantryRepository.delete(pantry);
+            return mapToResponse(pantryRepository.save(target));
+        }
+
+        pantry.setQuantityAvailable(quantityBase);
+        updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
+        pantry.setLowStockThreshold(thresholdBase);
         pantry.setExpiryDate(request.getExpiryDate());
 
         UserPantry saved = pantryRepository.save(pantry);
@@ -83,19 +104,26 @@ public class PantryServiceImpl implements PantryService {
     }
 
     @Override
-    public void removeItem(Long pantryId) {
-        if (!pantryRepository.existsById(pantryId)) {
-            throw new ResourceNotFoundException("Không tìm thấy mục pantry với ID: " + pantryId);
-        }
-        pantryRepository.deleteById(pantryId);
+    public void removeItem(Long userId, Long pantryId) {
+        UserPantry pantry = pantryRepository.findByIdAndUserId(pantryId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy mục pantry với ID: " + pantryId));
+        pantryRepository.delete(pantry);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, List<PantryResponse>> getMyPantry(Long userId, String filter) {
         List<UserPantry> items = pantryRepository.findByUserIdOrderByIngredient_Aisle_NameAscExpiryDateAsc(userId);
+        List<UserPantry> filteredItems = items;
 
-        List<PantryResponse> responses = items.stream()
+        if (filter != null && filter.equalsIgnoreCase("LOW_STOCK")) {
+            Set<Long> lowStockIngredientIds = findLowStockIngredientIds(items);
+            filteredItems = items.stream()
+                    .filter(item -> lowStockIngredientIds.contains(item.getIngredient().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        List<PantryResponse> responses = filteredItems.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
@@ -108,11 +136,7 @@ public class PantryServiceImpl implements PantryService {
                 case "EXPIRED" -> responses.stream()
                         .filter(r -> "EXPIRED".equals(r.getStatus()))
                         .collect(Collectors.toList());
-                case "LOW_STOCK" -> items.stream()
-                        .filter(p -> p.getLowStockThreshold() != null &&
-                                p.getQuantityAvailable().compareTo(p.getLowStockThreshold()) <= 0)
-                        .map(this::mapToResponse)
-                        .collect(Collectors.toList());
+                case "LOW_STOCK" -> responses;
                 default -> responses;
             };
         }
@@ -255,5 +279,43 @@ public class PantryServiceImpl implements PantryService {
         if (days < 0) return "EXPIRED";
         if (days <= 7) return "EXPIRING_SOON";
         return "FRESH";
+    }
+
+    private Optional<UserPantry> findMatchingLot(Long userId, Long ingredientId, LocalDate expiryDate) {
+        return expiryDate == null
+                ? pantryRepository.findByUserIdAndIngredientIdAndExpiryDateIsNull(userId, ingredientId)
+                : pantryRepository.findByUserIdAndIngredientIdAndExpiryDate(userId, ingredientId, expiryDate);
+    }
+
+    private java.math.BigDecimal resolveThreshold(
+            Long userId, Long ingredientId, java.math.BigDecimal requestedThreshold) {
+        if (requestedThreshold != null) {
+            updateThresholdForIngredient(userId, ingredientId, requestedThreshold);
+            return requestedThreshold;
+        }
+        return pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(userId, ingredientId).stream()
+                .map(UserPantry::getLowStockThreshold)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void updateThresholdForIngredient(
+            Long userId, Long ingredientId, java.math.BigDecimal threshold) {
+        pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(userId, ingredientId)
+                .forEach(lot -> lot.setLowStockThreshold(threshold));
+    }
+
+    private Set<Long> findLowStockIngredientIds(List<UserPantry> items) {
+        Map<Long, java.math.BigDecimal> totals = items.stream()
+                .collect(Collectors.groupingBy(item -> item.getIngredient().getId(),
+                        Collectors.reducing(java.math.BigDecimal.ZERO,
+                                UserPantry::getQuantityAvailable, java.math.BigDecimal::add)));
+        return items.stream()
+                .filter(item -> item.getLowStockThreshold() != null)
+                .filter(item -> totals.get(item.getIngredient().getId())
+                        .compareTo(item.getLowStockThreshold()) <= 0)
+                .map(item -> item.getIngredient().getId())
+                .collect(Collectors.toSet());
     }
 }
