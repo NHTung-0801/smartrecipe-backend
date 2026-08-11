@@ -6,6 +6,8 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -36,4 +38,12 @@ public class GroceryList {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @OneToMany(mappedBy = "groceryList", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<GroceryItem> items = new ArrayList<>();
+
+    @OneToMany(mappedBy = "groceryList", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<GroceryListRecipe> recipeSources = new ArrayList<>();
 }
