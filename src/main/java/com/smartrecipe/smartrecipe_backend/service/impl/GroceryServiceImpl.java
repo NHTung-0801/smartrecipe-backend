@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -259,7 +260,23 @@ public class GroceryServiceImpl implements GroceryService {
                     pantryRequest.setIngredientId(item.getIngredient().getId());
                     pantryRequest.setQuantityAvailable(item.getFinalToBuy());
                     pantryRequest.setUnit(item.getIngredient().getBaseUnit());
-                    pantryRequest.setExpiryDate(null); // unknown expiry
+                    
+                    LocalDate expiry = null;
+                    if (item.getIngredient().getAisle() != null) {
+                        String aisleName = item.getIngredient().getAisle().getName();
+                        if (aisleName.contains("Rau củ")) {
+                            expiry = LocalDate.now().plusDays(4);
+                        } else if (aisleName.contains("Thịt")) {
+                            expiry = LocalDate.now().plusDays(3);
+                        } else if (aisleName.contains("Sữa")) {
+                            expiry = LocalDate.now().plusDays(7);
+                        } else if (aisleName.contains("Gia vị")) {
+                            expiry = LocalDate.now().plusMonths(3);
+                        }
+                    }
+                    
+                    pantryRequest.setExpiryDate(expiry);
+                    pantryRequest.setLowStockThreshold(BigDecimal.ZERO);
                     pantryService.addOrUpdateItem(userId, pantryRequest);
                 }
             }
@@ -489,9 +506,9 @@ public class GroceryServiceImpl implements GroceryService {
                 .totalNeeded(item.getTotalNeeded())
                 .pantryDeducted(item.getPantryDeducted())
                 .finalToBuy(item.getFinalToBuy())
-                .unit(ingredient.getBaseUnit())
+                .unit(item.getIngredient().getBaseUnit())
                 .isBought(item.getIsBought())
-                .aisleName(ingredient.getAisle() != null ? ingredient.getAisle().getName() : null)
+                .aisleName(item.getIngredient().getAisle() != null ? item.getIngredient().getAisle().getName() : null)
                 .build();
     }
 }

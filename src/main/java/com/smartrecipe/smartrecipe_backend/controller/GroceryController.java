@@ -5,6 +5,8 @@ import com.smartrecipe.smartrecipe_backend.dto.request.GroceryItemRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.GroceryListRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.GroceryItemResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.GroceryListResponse;
+import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
+import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.service.GroceryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,12 @@ import java.util.Map;
 public class GroceryController {
 
     private final GroceryService groceryService;
+    private final UserRepository userRepository;
 
     private Long getUserId(Principal principal) {
-        return Long.parseLong(principal.getName());
+        return userRepository.findByUsername(principal.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"))
+                .getId();
     }
 
     // ---------- LIST ENDPOINTS ----------
