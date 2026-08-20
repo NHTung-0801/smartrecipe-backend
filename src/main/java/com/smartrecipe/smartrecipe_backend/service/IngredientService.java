@@ -14,5 +14,6 @@ public interface IngredientService {
     IngredientResponse getIngredientById(Long id);
     IngredientResponse createIngredient(IngredientRequest request);
     IngredientResponse updateIngredient(Long id, IngredientRequest request);
+    IngredientResponse updateIngredientAisle(Long id, Integer aisleId);
     void deleteIngredient(Long id);
 }

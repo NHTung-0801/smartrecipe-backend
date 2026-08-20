@@ -67,8 +67,23 @@ public class IngredientServiceImpl implements IngredientService {
     @Override
     @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
     public IngredientResponse createIngredient(IngredientRequest request) {
+        // Check if ingredient already exists to prevent duplicates
+        java.util.Optional<Ingredient> existingOpt = ingredientRepository.findFirstByNameIgnoreCase(request.getName().trim());
+        if (existingOpt.isPresent()) {
+            Ingredient existing = existingOpt.get();
+            // If existing ingredient doesn't have an aisle, but user provided one, update it
+            if (existing.getAisle() == null && request.getAisleId() != null) {
+                Aisle aisle = aisleRepository.findById(request.getAisleId()).orElse(null);
+                if (aisle != null) {
+                    existing.setAisle(aisle);
+                    existing = ingredientRepository.save(existing);
+                }
+            }
+            return mapToResponse(existing);
+        }
+
         Ingredient ingredient = Ingredient.builder()
-                .name(request.getName())
+                .name(request.getName().trim())
                 .baseUnit(request.getBaseUnit())
                 .caloriesPer100g(request.getCaloriesPer100g())
                 .protein(request.getProtein())
@@ -107,6 +122,23 @@ public class IngredientServiceImpl implements IngredientService {
             ingredient.setAisle(null);
         }
 
+        Ingredient saved = ingredientRepository.save(ingredient);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
+    public IngredientResponse updateIngredientAisle(Long id, Integer aisleId) {
+        Ingredient ingredient = ingredientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + id));
+
+        Aisle aisle = null;
+        if (aisleId != null) {
+            aisle = aisleRepository.findById(aisleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quầy hàng với ID: " + aisleId));
+        }
+        
+        ingredient.setAisle(aisle);
         Ingredient saved = ingredientRepository.save(ingredient);
         return mapToResponse(saved);
     }

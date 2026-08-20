@@ -44,16 +44,37 @@ public class PantryServiceImpl implements PantryService {
         java.math.BigDecimal thresholdBase = request.getLowStockThreshold() == null ? null
                 : unitNormalizationService.toBaseUnit(request.getLowStockThreshold(), request.getUnit(), ingredient);
 
-        Optional<UserPantry> existing = findMatchingLot(userId, request.getIngredientId(), request.getExpiryDate());
+        if (request.getExpiryDate() == null) {
+            request.setExpiryDate(calculateExpiryDate(ingredient));
+        }
 
-        if (existing.isPresent()) {
-            UserPantry pantry = existing.get();
-            pantry.setQuantityAvailable(pantry.getQuantityAvailable().add(quantityBase));
-            if (thresholdBase != null) {
-                updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
-                pantry.setLowStockThreshold(thresholdBase);
+        List<UserPantry> existingLots = pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(userId, request.getIngredientId());
+
+        if (!existingLots.isEmpty()) {
+            UserPantry primaryLot = existingLots.get(0);
+            
+            // Dồn tất cả các dòng cũ vào dòng đầu tiên để đảm bảo chỉ có 1 dòng duy nhất
+            if (existingLots.size() > 1) {
+                for (int i = 1; i < existingLots.size(); i++) {
+                    UserPantry dup = existingLots.get(i);
+                    primaryLot.setQuantityAvailable(primaryLot.getQuantityAvailable().add(dup.getQuantityAvailable()));
+                    pantryRepository.delete(dup);
+                }
             }
-            UserPantry saved = pantryRepository.save(pantry);
+            
+            // Cộng thêm số lượng mới vào
+            primaryLot.setQuantityAvailable(primaryLot.getQuantityAvailable().add(quantityBase));
+            
+            // Cập nhật lại hạn sử dụng theo lần thêm mới nhất
+            if (request.getExpiryDate() != null) {
+                primaryLot.setExpiryDate(request.getExpiryDate());
+            }
+
+            if (thresholdBase != null) {
+                primaryLot.setLowStockThreshold(thresholdBase);
+            }
+            
+            UserPantry saved = pantryRepository.save(primaryLot);
             return mapToResponse(saved);
         }
 
@@ -61,7 +82,7 @@ public class PantryServiceImpl implements PantryService {
                 .user(user)
                 .ingredient(ingredient)
                 .quantityAvailable(quantityBase)
-                .lowStockThreshold(resolveThreshold(userId, request.getIngredientId(), thresholdBase))
+                .lowStockThreshold(thresholdBase)
                 .expiryDate(request.getExpiryDate())
                 .build();
 
@@ -84,23 +105,13 @@ public class PantryServiceImpl implements PantryService {
                 : unitNormalizationService.toBaseUnit(
                         request.getLowStockThreshold(), request.getUnit(), pantry.getIngredient());
 
-        Optional<UserPantry> matchingLot = findMatchingLot(userId, request.getIngredientId(), request.getExpiryDate());
-        if (matchingLot.isPresent() && !matchingLot.get().getId().equals(pantryId)) {
-            UserPantry target = matchingLot.get();
-            target.setQuantityAvailable(target.getQuantityAvailable().add(quantityBase));
-            updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
-            target.setLowStockThreshold(thresholdBase);
-            pantryRepository.delete(pantry);
-            return mapToResponse(pantryRepository.save(target));
+        pantry.setQuantityAvailable(quantityBase);
+        pantry.setExpiryDate(request.getExpiryDate());
+        if (thresholdBase != null) {
+            pantry.setLowStockThreshold(thresholdBase);
         }
 
-        pantry.setQuantityAvailable(quantityBase);
-        updateThresholdForIngredient(userId, request.getIngredientId(), thresholdBase);
-        pantry.setLowStockThreshold(thresholdBase);
-        pantry.setExpiryDate(request.getExpiryDate());
-
-        UserPantry saved = pantryRepository.save(pantry);
-        return mapToResponse(saved);
+        return mapToResponse(pantryRepository.save(pantry));
     }
 
     @Override
@@ -281,10 +292,20 @@ public class PantryServiceImpl implements PantryService {
         return "FRESH";
     }
 
-    private Optional<UserPantry> findMatchingLot(Long userId, Long ingredientId, LocalDate expiryDate) {
-        return expiryDate == null
-                ? pantryRepository.findByUserIdAndIngredientIdAndExpiryDateIsNull(userId, ingredientId)
-                : pantryRepository.findByUserIdAndIngredientIdAndExpiryDate(userId, ingredientId, expiryDate);
+    private LocalDate calculateExpiryDate(Ingredient ingredient) {
+        if (ingredient.getAisle() != null) {
+            String aisleName = ingredient.getAisle().getName();
+            if (aisleName.contains("Rau củ")) {
+                return LocalDate.now().plusDays(4);
+            } else if (aisleName.contains("Thịt")) {
+                return LocalDate.now().plusDays(3);
+            } else if (aisleName.contains("Sữa")) {
+                return LocalDate.now().plusDays(7);
+            } else if (aisleName.contains("Gia vị")) {
+                return LocalDate.now().plusMonths(3);
+            }
+        }
+        return null;
     }
 
     private java.math.BigDecimal resolveThreshold(

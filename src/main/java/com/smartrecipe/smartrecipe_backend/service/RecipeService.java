@@ -21,6 +21,8 @@ public interface RecipeService {
 
     RecipeResponse changeStatus(Long id, com.smartrecipe.smartrecipe_backend.enums.RecipeStatus status, Long userId);
 
+    void recordCookSession(Long id, Long userId);
+
     // My Recipes (Draft & Public, exclude DELETED)
     Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size);
 
@@ -43,4 +45,7 @@ public interface RecipeService {
 
     // Upload image
     ImageUploadResponse uploadRecipeImage(Long recipeId, MultipartFile file, Long userId);
+
+    // Upload step image
+    ImageUploadResponse uploadStepImage(Long recipeId, Integer stepNumber, MultipartFile file, Long userId);
 }

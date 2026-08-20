@@ -143,20 +143,18 @@ public class GroceryServiceImpl implements GroceryService {
         BigDecimal totalNeeded = unitNormalizationService.toBaseUnit(
                 request.getQuantity(), request.getUnit(), ingredient);
 
-        // Deduct what's in pantry (aggregate across lots)
-        BigDecimal pantryDeducted = aggregatePantryQuantity(userId, ingredient.getId());
-        BigDecimal finalToBuy = totalNeeded.subtract(pantryDeducted, MC);
-        if (finalToBuy.compareTo(BigDecimal.ZERO) < 0) {
-            finalToBuy = BigDecimal.ZERO;
-        }
+        // For manual additions, we do not deduct from the pantry automatically.
+        BigDecimal pantryDeducted = BigDecimal.ZERO;
+        BigDecimal finalToBuy = totalNeeded;
 
-        // Merge with existing item for same ingredient
+        // Merge with existing item for same ingredient and same source (manual)
         GroceryItem existing = groceryItemRepository
-                .findByGroceryListIdAndIngredientId(listId, ingredient.getId())
+                .findFirstByGroceryListIdAndIngredientIdAndIsManual(listId, ingredient.getId(), true)
                 .orElse(null);
         if (existing != null) {
             totalNeeded = totalNeeded.add(existing.getTotalNeeded(), MC);
-            pantryDeducted = aggregatePantryQuantity(userId, ingredient.getId());
+            // existing is manual, so its pantryDeducted should be 0, but we use it just in case
+            pantryDeducted = existing.getPantryDeducted();
             finalToBuy = totalNeeded.subtract(pantryDeducted, MC);
             if (finalToBuy.compareTo(BigDecimal.ZERO) < 0) {
                 finalToBuy = BigDecimal.ZERO;
@@ -174,6 +172,7 @@ public class GroceryServiceImpl implements GroceryService {
                 .pantryDeducted(pantryDeducted)
                 .finalToBuy(finalToBuy)
                 .isBought(false)
+                .isManual(true)
                 .build();
         return toItemResponse(groceryItemRepository.save(item), ingredient);
     }
@@ -195,7 +194,11 @@ public class GroceryServiceImpl implements GroceryService {
         BigDecimal totalNeeded = unitNormalizationService.toBaseUnit(
                 request.getQuantity(), request.getUnit(), ingredient);
 
-        BigDecimal pantryDeducted = aggregatePantryQuantity(userId, ingredient.getId());
+        BigDecimal pantryDeducted = BigDecimal.ZERO;
+        if (!item.getIsManual()) {
+            pantryDeducted = aggregatePantryQuantity(userId, ingredient.getId());
+        }
+        
         BigDecimal finalToBuy = totalNeeded.subtract(pantryDeducted, MC);
         if (finalToBuy.compareTo(BigDecimal.ZERO) < 0) {
             finalToBuy = BigDecimal.ZERO;
@@ -346,7 +349,7 @@ public class GroceryServiceImpl implements GroceryService {
             }
 
             GroceryItem existing = groceryItemRepository
-                    .findByGroceryListIdAndIngredientId(list.getId(), ingredientId)
+                    .findFirstByGroceryListIdAndIngredientIdAndIsManual(list.getId(), ingredientId, false)
                     .orElse(null);
             if (existing != null) {
                 totalNeeded = totalNeeded.add(existing.getTotalNeeded(), MC);
@@ -420,7 +423,7 @@ public class GroceryServiceImpl implements GroceryService {
             BigDecimal finalToBuy = totalNeeded;
 
             GroceryItem existing = groceryItemRepository
-                    .findByGroceryListIdAndIngredientId(list.getId(), ingredientId)
+                    .findFirstByGroceryListIdAndIngredientIdAndIsManual(list.getId(), ingredientId, false)
                     .orElse(null);
             if (existing != null) {
                 totalNeeded = totalNeeded.add(existing.getTotalNeeded(), MC);
@@ -508,6 +511,7 @@ public class GroceryServiceImpl implements GroceryService {
                 .finalToBuy(item.getFinalToBuy())
                 .unit(item.getIngredient().getBaseUnit())
                 .isBought(item.getIsBought())
+                .isManual(item.getIsManual())
                 .aisleName(item.getIngredient().getAisle() != null ? item.getIngredient().getAisle().getName() : null)
                 .build();
     }

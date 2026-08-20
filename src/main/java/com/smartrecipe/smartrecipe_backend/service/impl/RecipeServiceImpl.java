@@ -11,6 +11,8 @@ import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.exception.UnauthorizedException;
 import com.smartrecipe.smartrecipe_backend.repository.*;
+import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
+import com.smartrecipe.smartrecipe_backend.repository.CookingJournalRepository;
 import com.smartrecipe.smartrecipe_backend.service.CloudinaryService;
 import com.smartrecipe.smartrecipe_backend.service.RecipeService;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final IngredientRepository ingredientRepository;
     private final TagRepository tagRepository;
     private final CloudinaryService cloudinaryService;
+    private final CookingJournalRepository cookingJournalRepository;
 
     // ==================== CRUD ====================
 
@@ -67,6 +70,7 @@ public class RecipeServiceImpl implements RecipeService {
         if (request.getSteps() != null) {
             List<RecipeStep> steps = request.getSteps().stream().map(s -> RecipeStep.builder()
                     .stepNumber(s.getStepNumber())
+                    .title(s.getTitle())
                     .instruction(s.getInstruction())
                     .recipe(recipe)
                     .build()).collect(Collectors.toList());
@@ -76,8 +80,27 @@ public class RecipeServiceImpl implements RecipeService {
         // Ingredients
         if (request.getIngredients() != null) {
             List<RecipeIngredient> ingredients = request.getIngredients().stream().map(ri -> {
-                Ingredient ing = ingredientRepository.findById(ri.getIngredientId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + ri.getIngredientId()));
+                Ingredient ing;
+                if (ri.getIngredientId() != null) {
+                    ing = ingredientRepository.findById(ri.getIngredientId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + ri.getIngredientId()));
+                } else if (ri.getIngredientName() != null && !ri.getIngredientName().trim().isEmpty()) {
+                    String name = ri.getIngredientName().trim();
+                    ing = ingredientRepository.findFirstByNameIgnoreCase(name)
+                            .orElseGet(() -> {
+                                Ingredient newIng = new Ingredient();
+                                newIng.setName(name);
+                                newIng.setBaseUnit(ri.getUnit() != null && !ri.getUnit().isEmpty() ? ri.getUnit() : "g");
+                                newIng.setCaloriesPer100g(java.math.BigDecimal.ZERO);
+                                newIng.setProtein(java.math.BigDecimal.ZERO);
+                                newIng.setFat(java.math.BigDecimal.ZERO);
+                                newIng.setCarbs(java.math.BigDecimal.ZERO);
+                                return ingredientRepository.save(newIng);
+                            });
+                } else {
+                    throw new IllegalArgumentException("Phải cung cấp ID hoặc tên nguyên liệu");
+                }
+                
                 return RecipeIngredient.builder()
                         .amount(ri.getAmount())
                         .unit(ri.getUnit())
@@ -137,6 +160,7 @@ public class RecipeServiceImpl implements RecipeService {
             request.getSteps().forEach(s -> {
                 RecipeStep step = RecipeStep.builder()
                         .stepNumber(s.getStepNumber())
+                        .title(s.getTitle())
                         .instruction(s.getInstruction())
                         .recipe(recipe)
                         .build();
@@ -148,8 +172,27 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.getIngredients().clear();
         if (request.getIngredients() != null) {
             request.getIngredients().forEach(ri -> {
-                Ingredient ing = ingredientRepository.findById(ri.getIngredientId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + ri.getIngredientId()));
+                Ingredient ing;
+                if (ri.getIngredientId() != null) {
+                    ing = ingredientRepository.findById(ri.getIngredientId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + ri.getIngredientId()));
+                } else if (ri.getIngredientName() != null && !ri.getIngredientName().trim().isEmpty()) {
+                    String name = ri.getIngredientName().trim();
+                    ing = ingredientRepository.findFirstByNameIgnoreCase(name)
+                            .orElseGet(() -> {
+                                Ingredient newIng = new Ingredient();
+                                newIng.setName(name);
+                                newIng.setBaseUnit(ri.getUnit() != null && !ri.getUnit().isEmpty() ? ri.getUnit() : "g");
+                                newIng.setCaloriesPer100g(java.math.BigDecimal.ZERO);
+                                newIng.setProtein(java.math.BigDecimal.ZERO);
+                                newIng.setFat(java.math.BigDecimal.ZERO);
+                                newIng.setCarbs(java.math.BigDecimal.ZERO);
+                                return ingredientRepository.save(newIng);
+                            });
+                } else {
+                    throw new IllegalArgumentException("Phải cung cấp ID hoặc tên nguyên liệu");
+                }
+
                 RecipeIngredient recIng = RecipeIngredient.builder()
                         .amount(ri.getAmount())
                         .unit(ri.getUnit())
@@ -161,17 +204,30 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         // Replace tags
-        recipe.getTags().clear();
         if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
-            request.getTagIds().forEach(tagId -> {
-                Tag tag = tagRepository.findById(tagId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thẻ tag với ID: " + tagId));
-                RecipeTag recTag = RecipeTag.builder()
-                        .recipe(recipe)
-                        .tag(tag)
-                        .build();
-                recipe.getTags().add(recTag);
+            java.util.Set<Integer> newTagIds = new java.util.HashSet<>(request.getTagIds());
+            
+            // Remove tags not in the new list
+            recipe.getTags().removeIf(rt -> !newTagIds.contains(rt.getTag().getId()));
+            
+            // Find existing tag IDs
+            List<Integer> existingTagIds = recipe.getTags().stream()
+                    .map(rt -> rt.getTag().getId()).collect(java.util.stream.Collectors.toList());
+            
+            // Add new tags
+            newTagIds.forEach(tagId -> {
+                if (!existingTagIds.contains(tagId)) {
+                    Tag tag = tagRepository.findById(tagId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thẻ tag với ID: " + tagId));
+                    RecipeTag recTag = RecipeTag.builder()
+                            .recipe(recipe)
+                            .tag(tag)
+                            .build();
+                    recipe.getTags().add(recTag);
+                }
             });
+        } else {
+            recipe.getTags().clear();
         }
 
         Recipe saved = recipeRepository.save(recipe);
@@ -243,6 +299,23 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     // ==================== CLONE ====================
+
+    @Override
+    @Transactional
+    public void recordCookSession(Long id, Long userId) {
+        Recipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công thức với ID: " + id));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+
+        com.smartrecipe.smartrecipe_backend.entity.CookingJournal journal = com.smartrecipe.smartrecipe_backend.entity.CookingJournal.builder()
+                .recipe(recipe)
+                .user(user)
+                .actualServings(recipe.getBaseServings())
+                .rating(null) // Rating will be implemented later
+                .build();
+        cookingJournalRepository.save(journal);
+    }
 
     @Override
     public RecipeResponse cloneRecipe(Long id, Long userId) {
@@ -353,6 +426,30 @@ public class RecipeServiceImpl implements RecipeService {
                 .build();
     }
 
+    @Override
+    public ImageUploadResponse uploadStepImage(Long recipeId, Integer stepNumber, MultipartFile file, Long userId) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công thức với ID: " + recipeId));
+
+        if (!recipe.getAuthor().getId().equals(userId)) {
+            throw new UnauthorizedException("Bạn không có quyền upload ảnh cho công thức này");
+        }
+
+        RecipeStep step = recipe.getSteps().stream()
+                .filter(s -> s.getStepNumber().equals(stepNumber))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bước " + stepNumber));
+
+        String imageUrl = cloudinaryService.uploadImage(file, "smartrecipe/recipes/steps");
+        step.setImageUrl(imageUrl);
+        recipeRepository.save(recipe);
+
+        return ImageUploadResponse.builder()
+                .imageUrl(imageUrl)
+                .publicId(imageUrl.substring(imageUrl.lastIndexOf('/') + 1))
+                .build();
+    }
+
     // ==================== MAPPING ====================
 
     private RecipeResponse mapToDetailResponse(Recipe recipe) {
@@ -360,7 +457,9 @@ public class RecipeServiceImpl implements RecipeService {
                 .map(s -> RecipeStepResponse.builder()
                         .id(s.getId())
                         .stepNumber(s.getStepNumber())
+                        .title(s.getTitle())
                         .instruction(s.getInstruction())
+                        .imageUrl(s.getImageUrl())
                         .build())
                 .collect(Collectors.toList());
 
@@ -384,6 +483,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .collect(Collectors.toList());
 
         NutritionSummaryResponse nutrition = calculateNutrition(recipe);
+        Integer cookCount = cookingJournalRepository.countByRecipeId(recipe.getId());
 
         return RecipeResponse.builder()
                 .id(recipe.getId())
@@ -397,6 +497,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(recipe.getDifficulty())
                 .likeCount(recipe.getLikeCount())
                 .clonedFromId(recipe.getClonedFrom() != null ? recipe.getClonedFrom().getId() : null)
+                .cookCount(cookCount)
                 .createdAt(recipe.getCreatedAt())
                 .updatedAt(recipe.getUpdatedAt())
                 .author(mapAuthor(recipe.getAuthor()))
@@ -416,6 +517,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .collect(Collectors.toList());
 
         NutritionSummaryResponse nutrition = calculateNutrition(recipe);
+        Integer cookCount = cookingJournalRepository.countByRecipeId(recipe.getId());
 
         return RecipeSummaryResponse.builder()
                 .id(recipe.getId())
@@ -429,6 +531,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(recipe.getDifficulty())
                 .likeCount(recipe.getLikeCount())
                 .clonedFromId(recipe.getClonedFrom() != null ? recipe.getClonedFrom().getId() : null)
+                .cookCount(cookCount)
                 .createdAt(recipe.getCreatedAt())
                 .updatedAt(recipe.getUpdatedAt())
                 .author(mapAuthor(recipe.getAuthor()))
