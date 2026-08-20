@@ -148,6 +148,17 @@ public class RecipeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // ==================== COOKING JOURNAL ====================
+
+    @PostMapping("/{id}/cook")
+    public ResponseEntity<Void> recordCookSession(
+            @PathVariable Long id,
+            Principal principal) {
+        Long userId = getUserId(principal);
+        recipeService.recordCookSession(id, userId);
+        return ResponseEntity.ok().build();
+    }
+
     // ==================== LIKE / UNLIKE ====================
 
     @PostMapping("/{id}/like")
@@ -177,6 +188,17 @@ public class RecipeController {
             Principal principal) {
         Long userId = getUserId(principal);
         ImageUploadResponse response = recipeService.uploadRecipeImage(id, file, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping(value = "/{id}/steps/{stepNumber}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ImageUploadResponse> uploadStepImage(
+            @PathVariable Long id,
+            @PathVariable Integer stepNumber,
+            @RequestParam("file") MultipartFile file,
+            Principal principal) {
+        Long userId = getUserId(principal);
+        ImageUploadResponse response = recipeService.uploadStepImage(id, stepNumber, file, userId);
         return ResponseEntity.ok(response);
     }
 }

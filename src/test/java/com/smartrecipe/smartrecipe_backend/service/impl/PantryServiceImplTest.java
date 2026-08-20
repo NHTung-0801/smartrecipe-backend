@@ -55,8 +55,8 @@ class PantryServiceImplTest {
         when(ingredientRepository.findById(11L)).thenReturn(Optional.of(ingredient));
         when(unitNormalizationService.toBaseUnit(new BigDecimal("1"), "kg", ingredient))
                 .thenReturn(new BigDecimal("1000"));
-        when(pantryRepository.findByUserIdAndIngredientIdAndExpiryDate(7L, 11L, expiry))
-                .thenReturn(Optional.of(existing));
+        when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 11L))
+                .thenReturn(List.of(existing));
         when(pantryRepository.save(existing)).thenReturn(existing);
 
         PantryResponse response = service.addOrUpdateItem(7L, request);
@@ -73,9 +73,8 @@ class PantryServiceImplTest {
         when(ingredientRepository.findById(11L)).thenReturn(Optional.of(ingredient));
         when(unitNormalizationService.toBaseUnit(new BigDecimal("250"), "g", ingredient))
                 .thenReturn(new BigDecimal("250"));
-        when(pantryRepository.findByUserIdAndIngredientIdAndExpiryDate(7L, 11L, expiry))
-                .thenReturn(Optional.empty());
-        when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 11L)).thenReturn(List.of());
+        when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 11L))
+                .thenReturn(List.of());
         when(pantryRepository.save(any(UserPantry.class))).thenAnswer(invocation -> {
             UserPantry saved = invocation.getArgument(0);
             saved.setId(21L);

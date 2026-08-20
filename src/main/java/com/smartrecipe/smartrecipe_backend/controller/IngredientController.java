@@ -63,6 +63,13 @@ public class IngredientController {
         return ResponseEntity.ok(ApiResponse.success(ingredient, "Cập nhật nguyên liệu thành công!"));
     }
 
+    @PatchMapping("/{id}/aisle")
+    public ResponseEntity<ApiResponse<IngredientResponse>> updateIngredientAisle(
+            @PathVariable Long id, @Valid @RequestBody com.smartrecipe.smartrecipe_backend.dto.request.AisleUpdateRequest request) {
+        IngredientResponse ingredient = ingredientService.updateIngredientAisle(id, request.getAisleId());
+        return ResponseEntity.ok(ApiResponse.success(ingredient, "Cập nhật loại nguyên liệu thành công!"));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteIngredient(@PathVariable Long id) {
