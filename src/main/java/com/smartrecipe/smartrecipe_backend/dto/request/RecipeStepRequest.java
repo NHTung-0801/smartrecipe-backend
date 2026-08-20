@@ -18,6 +18,8 @@ public class RecipeStepRequest {
     @Min(value = 1, message = "Số thứ tự bước phải lớn hơn 0")
     private Integer stepNumber;
 
+    private String title;
+
     @NotBlank(message = "Hướng dẫn không được để trống")
     private String instruction;
 }

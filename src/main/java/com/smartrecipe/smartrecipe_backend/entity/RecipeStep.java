@@ -22,6 +22,12 @@ public class RecipeStep {
     @Column(name = "step_number", nullable = false)
     private Integer stepNumber;
 
+    @Column(length = 255)
+    private String title;
+
     @Column(columnDefinition = "TEXT", nullable = false)
     private String instruction;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
 }

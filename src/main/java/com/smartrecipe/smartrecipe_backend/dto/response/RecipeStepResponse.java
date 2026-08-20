@@ -12,5 +12,7 @@ import lombok.NoArgsConstructor;
 public class RecipeStepResponse {
     private Long id;
     private Integer stepNumber;
+    private String title;
     private String instruction;
+    private String imageUrl;
 }

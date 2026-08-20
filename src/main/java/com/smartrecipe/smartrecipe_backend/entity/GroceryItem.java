@@ -36,4 +36,8 @@ public class GroceryItem {
     @Builder.Default
     @Column(name = "is_bought")
     private Boolean isBought = false;
+
+    @Builder.Default
+    @Column(name = "is_manual")
+    private Boolean isManual = false;
 }

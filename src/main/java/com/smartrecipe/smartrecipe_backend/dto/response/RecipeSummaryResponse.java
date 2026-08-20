@@ -25,6 +25,7 @@ public class RecipeSummaryResponse {
     private Integer cookTime;
     private Difficulty difficulty;
     private Integer likeCount;
+    private Integer cookCount;
     private Long clonedFromId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

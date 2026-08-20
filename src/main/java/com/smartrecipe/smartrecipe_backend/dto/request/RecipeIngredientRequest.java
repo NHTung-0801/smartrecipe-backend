@@ -16,8 +16,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class RecipeIngredientRequest {
 
-    @NotNull(message = "ID nguyên liệu không được để trống")
     private Long ingredientId;
+
+    private String ingredientName;
 
     @NotNull(message = "Số lượng không được để trống")
     @DecimalMin(value = "0.01", message = "Số lượng phải lớn hơn 0")

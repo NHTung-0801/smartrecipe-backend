@@ -19,5 +19,6 @@ public class GroceryItemResponse {
     private BigDecimal finalToBuy;
     private String unit;
     private Boolean isBought;
+    private Boolean isManual;
     private String aisleName;
 }
