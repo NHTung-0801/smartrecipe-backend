@@ -21,5 +21,5 @@ public interface GroceryItemRepository extends JpaRepository<GroceryItem, Long> 
     @Query("DELETE FROM GroceryItem gi WHERE gi.groceryList.id = :listId")
     void deleteByGroceryListId(@Param("listId") Long listId);
 
-    Optional<GroceryItem> findByGroceryListIdAndIngredientId(Long groceryListId, Long ingredientId);
+    Optional<GroceryItem> findFirstByGroceryListIdAndIngredientIdAndIsManual(Long groceryListId, Long ingredientId, Boolean isManual);
 }

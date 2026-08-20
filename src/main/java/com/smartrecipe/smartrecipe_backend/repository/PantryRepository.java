@@ -18,11 +18,6 @@ public interface PantryRepository extends JpaRepository<UserPantry, Long> {
     @EntityGraph(attributePaths = {"ingredient", "ingredient.aisle"})
     List<UserPantry> findByUserIdOrderByIngredient_Aisle_NameAscExpiryDateAsc(Long userId);
 
-    Optional<UserPantry> findByUserIdAndIngredientIdAndExpiryDate(
-            Long userId, Long ingredientId, LocalDate expiryDate);
-
-    Optional<UserPantry> findByUserIdAndIngredientIdAndExpiryDateIsNull(Long userId, Long ingredientId);
-
     List<UserPantry> findByUserIdAndIngredientIdOrderByExpiryDateAsc(Long userId, Long ingredientId);
 
     /** Tìm đúng một mục pantry đồng thời xác nhận ownership của user. */
