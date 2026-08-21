@@ -3,26 +3,34 @@ package com.smartrecipe.smartrecipe_backend.service.impl;
 import com.smartrecipe.smartrecipe_backend.dto.request.PantryRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.AisleResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.IngredientResponse;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.PantryResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.PantrySummaryResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Ingredient;
+import com.smartrecipe.smartrecipe_backend.entity.Recipe;
+import com.smartrecipe.smartrecipe_backend.entity.RecipeIngredient;
 import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.entity.UserPantry;
 import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.IngredientRepository;
 import com.smartrecipe.smartrecipe_backend.repository.PantryRepository;
+import com.smartrecipe.smartrecipe_backend.repository.RecipeRepository;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.service.PantryService;
 import com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -31,6 +39,7 @@ public class PantryServiceImpl implements PantryService {
     private final PantryRepository pantryRepository;
     private final IngredientRepository ingredientRepository;
     private final UserRepository userRepository;
+    private final RecipeRepository recipeRepository;
     private final UnitNormalizationService unitNormalizationService;
 
     @Override
@@ -338,5 +347,81 @@ public class PantryServiceImpl implements PantryService {
                         .compareTo(item.getLowStockThreshold()) <= 0)
                 .map(item -> item.getIngredient().getId())
                 .collect(Collectors.toSet());
+    }
+
+    // ========== FEFO Deduction (Task 2.1) ==========
+
+    @Override
+    public List<JournalResponse.DeductionDetail> deductIngredientsForRecipe(
+            Long userId, Long recipeId, int actualServings) {
+
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy công thức với ID: " + recipeId));
+
+        BigDecimal ratio = BigDecimal.valueOf(actualServings)
+                .divide(BigDecimal.valueOf(recipe.getBaseServings()), MathContext.DECIMAL128);
+
+        List<JournalResponse.DeductionDetail> deductions = new ArrayList<>();
+
+        for (RecipeIngredient ri : recipe.getIngredients()) {
+            Ingredient ingredient = ri.getIngredient();
+
+            // Tính số lượng cần trừ, quy đổi về baseUnit
+            BigDecimal requiredInBaseUnit;
+            try {
+                BigDecimal scaledAmount = ri.getAmount().multiply(ratio, MathContext.DECIMAL128);
+                requiredInBaseUnit = unitNormalizationService.toBaseUnit(
+                        scaledAmount, ri.getUnit(), ingredient);
+            } catch (BadRequestException e) {
+                // Edge case: đơn vị không quy đổi được → bỏ qua nguyên liệu này
+                log.warn("Bỏ qua trừ kho cho '{}': {}", ingredient.getName(), e.getMessage());
+                continue;
+            }
+
+            // Tìm các lô trong kho, sort theo expiryDate ASC (FEFO)
+            List<UserPantry> lots = pantryRepository
+                    .findByUserIdAndIngredientIdOrderByExpiryDateAsc(userId, ingredient.getId());
+
+            if (lots.isEmpty()) {
+                // Edge case: nguyên liệu không có trong kho → skip
+                log.debug("Nguyên liệu '{}' không có trong kho, bỏ qua.", ingredient.getName());
+                continue;
+            }
+
+            // Trừ dần theo FEFO
+            BigDecimal remaining = requiredInBaseUnit;
+            BigDecimal totalDeducted = BigDecimal.ZERO;
+
+            Iterator<UserPantry> it = lots.iterator();
+            while (remaining.signum() > 0 && it.hasNext()) {
+                UserPantry lot = it.next();
+                BigDecimal available = lot.getQuantityAvailable();
+
+                if (available.compareTo(remaining) <= 0) {
+                    // Lô này không đủ hoặc vừa đủ → dùng hết lô, xóa đi
+                    totalDeducted = totalDeducted.add(available);
+                    remaining = remaining.subtract(available);
+                    pantryRepository.delete(lot);
+                } else {
+                    // Lô này dư → trừ bớt và giữ lại
+                    totalDeducted = totalDeducted.add(remaining);
+                    lot.setQuantityAvailable(available.subtract(remaining));
+                    pantryRepository.save(lot);
+                    remaining = BigDecimal.ZERO;
+                }
+            }
+
+            // Ghi nhận kết quả trừ (nếu có trừ thực tế)
+            if (totalDeducted.signum() > 0) {
+                deductions.add(JournalResponse.DeductionDetail.builder()
+                        .ingredientName(ingredient.getName())
+                        .deductedAmount(totalDeducted.doubleValue())
+                        .unit(ingredient.getBaseUnit())
+                        .build());
+            }
+        }
+
+        return deductions;
     }
 }

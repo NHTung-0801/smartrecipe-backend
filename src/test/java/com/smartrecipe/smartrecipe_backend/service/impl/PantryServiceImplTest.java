@@ -1,16 +1,19 @@
 package com.smartrecipe.smartrecipe_backend.service.impl;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.PantryRequest;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.PantryResponse;
-import com.smartrecipe.smartrecipe_backend.entity.Ingredient;
-import com.smartrecipe.smartrecipe_backend.entity.User;
-import com.smartrecipe.smartrecipe_backend.entity.UserPantry;
+import com.smartrecipe.smartrecipe_backend.entity.*;
+import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.IngredientRepository;
 import com.smartrecipe.smartrecipe_backend.repository.PantryRepository;
+import com.smartrecipe.smartrecipe_backend.repository.RecipeRepository;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -18,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +38,7 @@ class PantryServiceImplTest {
     @Mock PantryRepository pantryRepository;
     @Mock IngredientRepository ingredientRepository;
     @Mock UserRepository userRepository;
+    @Mock RecipeRepository recipeRepository;
     @Mock UnitNormalizationService unitNormalizationService;
 
     private PantryServiceImpl service;
@@ -41,7 +47,8 @@ class PantryServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new PantryServiceImpl(pantryRepository, ingredientRepository, userRepository, unitNormalizationService);
+        service = new PantryServiceImpl(pantryRepository, ingredientRepository,
+                userRepository, recipeRepository, unitNormalizationService);
         user = User.builder().id(7L).username("owner").build();
         ingredient = Ingredient.builder().id(11L).name("Gạo").baseUnit("g").build();
     }
@@ -123,6 +130,135 @@ class PantryServiceImplTest {
         assertThat(result).isEmpty();
     }
 
+    // ========== FEFO Deduction Tests (Task 2.1) ==========
+
+    @Nested
+    @DisplayName("deductIngredientsForRecipe — FEFO Deduction")
+    class FEFODeductionTests {
+
+        private Ingredient egg;
+        private Recipe recipe;
+
+        @BeforeEach
+        void setUpRecipe() {
+            egg = Ingredient.builder().id(100L).name("Trứng gà").baseUnit("quả").build();
+
+            RecipeIngredient ri = RecipeIngredient.builder()
+                    .ingredient(egg)
+                    .amount(new BigDecimal("3"))   // 3 quả cho 2 người
+                    .unit("quả")
+                    .build();
+
+            recipe = Recipe.builder()
+                    .id(1L)
+                    .title("Trứng chiên")
+                    .baseServings(2)
+                    .ingredients(new ArrayList<>(List.of(ri)))
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Case 1: Trừ vừa đủ từ 1 lô duy nhất")
+        void deductExactFromSingleLot() {
+            when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+            when(unitNormalizationService.toBaseUnit(any(BigDecimal.class), eq("quả"), eq(egg)))
+                    .thenAnswer(inv -> inv.getArgument(0)); // quả → quả, no conversion
+            UserPantry lot1 = UserPantry.builder().id(10L).user(user).ingredient(egg)
+                    .quantityAvailable(new BigDecimal("5")).expiryDate(LocalDate.of(2026, 9, 1)).build();
+            when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 100L))
+                    .thenReturn(new ArrayList<>(List.of(lot1)));
+            when(pantryRepository.save(lot1)).thenReturn(lot1);
+
+            // Nấu cho 2 người (= baseServings) → cần 3 quả
+            List<JournalResponse.DeductionDetail> result = service.deductIngredientsForRecipe(7L, 1L, 2);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getIngredientName()).isEqualTo("Trứng gà");
+            assertThat(result.get(0).getDeductedAmount()).isEqualTo(3.0);
+            assertThat(lot1.getQuantityAvailable()).isEqualByComparingTo("2"); // 5 - 3 = 2
+            verify(pantryRepository).save(lot1);
+            verify(pantryRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("Case 2: Trừ vượt qua nhiều lô (FEFO)")
+        void deductAcrossMultipleLots() {
+            when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+            when(unitNormalizationService.toBaseUnit(any(BigDecimal.class), eq("quả"), eq(egg)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+            // Lô 1: hết hạn ngày mai, chỉ còn 1 quả
+            UserPantry lot1 = UserPantry.builder().id(10L).user(user).ingredient(egg)
+                    .quantityAvailable(new BigDecimal("1")).expiryDate(LocalDate.of(2026, 8, 22)).build();
+            // Lô 2: hết hạn tuần sau, còn 10 quả
+            UserPantry lot2 = UserPantry.builder().id(11L).user(user).ingredient(egg)
+                    .quantityAvailable(new BigDecimal("10")).expiryDate(LocalDate.of(2026, 8, 28)).build();
+            when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 100L))
+                    .thenReturn(new ArrayList<>(List.of(lot1, lot2)));
+            when(pantryRepository.save(lot2)).thenReturn(lot2);
+
+            // Nấu cho 2 người → cần 3 quả
+            List<JournalResponse.DeductionDetail> result = service.deductIngredientsForRecipe(7L, 1L, 2);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getDeductedAmount()).isEqualTo(3.0); // 1 + 2
+            verify(pantryRepository).delete(lot1);  // Lô 1 bị xóa (hết)
+            verify(pantryRepository).save(lot2);    // Lô 2 còn 8 quả
+            assertThat(lot2.getQuantityAvailable()).isEqualByComparingTo("8");
+        }
+
+        @Test
+        @DisplayName("Case 3: Kho không đủ → trừ về 0, không exception")
+        void deductInsufficientStock_noException() {
+            when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+            when(unitNormalizationService.toBaseUnit(any(BigDecimal.class), eq("quả"), eq(egg)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+            // Chỉ còn 1 quả nhưng cần 3
+            UserPantry lot1 = UserPantry.builder().id(10L).user(user).ingredient(egg)
+                    .quantityAvailable(new BigDecimal("1")).expiryDate(LocalDate.of(2026, 9, 1)).build();
+            when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 100L))
+                    .thenReturn(new ArrayList<>(List.of(lot1)));
+
+            List<JournalResponse.DeductionDetail> result = service.deductIngredientsForRecipe(7L, 1L, 2);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getDeductedAmount()).isEqualTo(1.0); // chỉ trừ được 1
+            verify(pantryRepository).delete(lot1); // lô bị xóa vì hết
+        }
+
+        @Test
+        @DisplayName("Case 4: Nguyên liệu không có trong kho → skip, không exception")
+        void deductMissingIngredient_skip() {
+            when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+            when(unitNormalizationService.toBaseUnit(any(BigDecimal.class), eq("quả"), eq(egg)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+            // Kho rỗng cho nguyên liệu này
+            when(pantryRepository.findByUserIdAndIngredientIdOrderByExpiryDateAsc(7L, 100L))
+                    .thenReturn(new ArrayList<>());
+
+            List<JournalResponse.DeductionDetail> result = service.deductIngredientsForRecipe(7L, 1L, 2);
+
+            assertThat(result).isEmpty(); // không trừ gì, không lỗi
+            verify(pantryRepository, never()).delete(any());
+            verify(pantryRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Case 5: Đơn vị không quy đổi được → skip, không exception")
+        void deductUnconvertibleUnit_skip() {
+            when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+            when(unitNormalizationService.toBaseUnit(any(BigDecimal.class), eq("quả"), eq(egg)))
+                    .thenThrow(new BadRequestException("Không thể quy đổi 'quả' sang 'g'"));
+
+            List<JournalResponse.DeductionDetail> result = service.deductIngredientsForRecipe(7L, 1L, 2);
+
+            assertThat(result).isEmpty(); // bỏ qua, không lỗi
+            verify(pantryRepository, never()).delete(any());
+            verify(pantryRepository, never()).save(any());
+        }
+    }
+
+    // ========== Helpers ==========
+
     private PantryRequest request(LocalDate expiry, String quantity, String unit) {
         PantryRequest request = new PantryRequest();
         request.setIngredientId(11L);
@@ -142,3 +278,4 @@ class PantryServiceImplTest {
                 .build();
     }
 }
+

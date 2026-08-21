@@ -1,6 +1,7 @@
 package com.smartrecipe.smartrecipe_backend.service;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.PantryRequest;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.PantryResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.PantrySummaryResponse;
 
@@ -29,4 +30,15 @@ public interface PantryService {
 
     /** Lấy tổng quan trạng thái pantry. */
     PantrySummaryResponse getPantrySummary(Long userId);
-}
+
+    /**
+     * Tự động trừ nguyên liệu khỏi kho theo cơ chế FEFO (First Expire First Out).
+     * Dùng khi user ghi nhận đã nấu xong một công thức (Cooking Journal).
+     *
+     * @param userId         ID người dùng
+     * @param recipeId       ID công thức đã nấu
+     * @param actualServings Số khẩu phần thực tế đã nấu
+     * @return Danh sách chi tiết các nguyên liệu đã trừ (để hiển thị cho user)
+     */
+    List<JournalResponse.DeductionDetail> deductIngredientsForRecipe(Long userId, Long recipeId, int actualServings);
+}
