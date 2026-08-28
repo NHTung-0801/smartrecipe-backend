@@ -264,20 +264,7 @@ public class GroceryServiceImpl implements GroceryService {
                     pantryRequest.setQuantityAvailable(item.getFinalToBuy());
                     pantryRequest.setUnit(item.getIngredient().getBaseUnit());
                     
-                    LocalDate expiry = null;
-                    if (item.getIngredient().getAisle() != null) {
-                        String aisleName = item.getIngredient().getAisle().getName();
-                        if (aisleName.contains("Rau củ")) {
-                            expiry = LocalDate.now().plusDays(4);
-                        } else if (aisleName.contains("Thịt")) {
-                            expiry = LocalDate.now().plusDays(3);
-                        } else if (aisleName.contains("Sữa")) {
-                            expiry = LocalDate.now().plusDays(7);
-                        } else if (aisleName.contains("Gia vị")) {
-                            expiry = LocalDate.now().plusMonths(3);
-                        }
-                    }
-                    
+                    LocalDate expiry = resolveDefaultExpiry(item.getIngredient().getAisle());
                     pantryRequest.setExpiryDate(expiry);
                     pantryRequest.setLowStockThreshold(BigDecimal.ZERO);
                     pantryService.addOrUpdateItem(userId, pantryRequest);
@@ -287,6 +274,38 @@ public class GroceryServiceImpl implements GroceryService {
 
         list = groceryListRepository.save(list);
         return toListResponse(list);
+    }
+
+    /**
+     * Hạn sử dụng mặc định khi đưa hàng vừa mua vào tủ, theo kệ hàng.
+     *
+     * Khớp theo id chứ không theo tên kệ: bản cũ dùng
+     * {@code aisleName.contains("Rau củ")} và chỉ trúng 4 trong 9 kệ, nên
+     * 113/290 nguyên liệu (Hải sản, Trái cây, Đồ khô, Hạt, Dầu mỡ) vào tủ
+     * với expiry = null. Id do sql/init_database.sql ghi tường minh 1-9 nên
+     * ổn định, còn tên kệ thì admin sửa được qua API.
+     *
+     * @param aisle kệ của nguyên liệu, có thể null nếu kệ đã bị xóa
+     *              (aisle_id ON DELETE SET NULL)
+     * @return ngày hết hạn dự kiến, hoặc null nếu không xác định được kệ
+     */
+    private LocalDate resolveDefaultExpiry(Aisle aisle) {
+        if (aisle == null || aisle.getId() == null) {
+            return null;
+        }
+        LocalDate today = LocalDate.now();
+        switch (aisle.getId()) {
+            case 1:  return today.plusDays(4);      // Rau củ
+            case 2:  return today.plusDays(3);      // Thịt & Gia cầm
+            case 3:  return today.plusDays(2);      // Hải sản - nhanh hỏng nhất
+            case 4:  return today.plusMonths(3);    // Gia vị & Nước chấm
+            case 5:  return today.plusMonths(6);    // Đồ khô & Gạo
+            case 6:  return today.plusDays(7);      // Sữa & Trứng
+            case 7:  return today.plusDays(5);      // Trái cây
+            case 8:  return today.plusMonths(6);    // Dầu mỡ & Chất béo
+            case 9:  return today.plusMonths(3);    // Các loại Hạt
+            default: return null;                   // kệ do admin thêm sau
+        }
     }
 
     // ---------- GENERATE ----------
