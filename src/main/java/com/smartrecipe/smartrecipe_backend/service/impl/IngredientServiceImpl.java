@@ -1,6 +1,7 @@
 package com.smartrecipe.smartrecipe_backend.service.impl;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.IngredientRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.QuickIngredientRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.AisleResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.IngredientResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Aisle;
@@ -10,6 +11,8 @@ import com.smartrecipe.smartrecipe_backend.repository.AisleRepository;
 import com.smartrecipe.smartrecipe_backend.repository.IngredientRepository;
 import com.smartrecipe.smartrecipe_backend.service.IngredientService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -17,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class IngredientServiceImpl implements IngredientService {
+
+    private static final Logger log = LoggerFactory.getLogger(IngredientServiceImpl.class);
 
     private final IngredientRepository ingredientRepository;
     private final AisleRepository aisleRepository;
@@ -98,6 +104,47 @@ public class IngredientServiceImpl implements IngredientService {
         }
 
         Ingredient saved = ingredientRepository.save(ingredient);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    @CacheEvict(value = {"ingredients_search", "ingredients_by_aisle", "ingredient"}, allEntries = true)
+    public IngredientResponse createQuickIngredient(QuickIngredientRequest request) {
+        String name = request.getName().trim();
+
+        // Trả về bản có sẵn nếu trùng tên, giống createIngredient — tránh sinh
+        // trùng lặp trong bảng 290 dòng vừa seed sạch.
+        var existingOpt = ingredientRepository.findFirstByNameIgnoreCase(name);
+        if (existingOpt.isPresent()) {
+            Ingredient existing = existingOpt.get();
+            if (existing.getAisle() == null && request.getAisleId() != null) {
+                aisleRepository.findById(request.getAisleId()).ifPresent(existing::setAisle);
+                existing = ingredientRepository.save(existing);
+            }
+            return mapToResponse(existing);
+        }
+
+        Ingredient ingredient = Ingredient.builder()
+                .name(name)
+                // 'g' cố định: user thường không được chọn đơn vị, vì đơn vị ngoài
+                // 'g'/'ml' không có đường quy đổi trong unit_conversions.
+                .baseUnit("g")
+                // Dinh dưỡng = 0 là cờ "chờ admin kiểm duyệt". Admin lọc bằng
+                // calories_per_100g = 0 (hiện chỉ có 'Muối' hợp lệ ở mức 0).
+                .caloriesPer100g(BigDecimal.ZERO)
+                .protein(BigDecimal.ZERO)
+                .fat(BigDecimal.ZERO)
+                .carbs(BigDecimal.ZERO)
+                .build();
+
+        if (request.getAisleId() != null) {
+            Aisle aisle = aisleRepository.findById(request.getAisleId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quầy hàng với ID: " + request.getAisleId()));
+            ingredient.setAisle(aisle);
+        }
+
+        Ingredient saved = ingredientRepository.save(ingredient);
+        log.warn("User tự thêm nguyên liệu chưa có dinh dưỡng: id={} name='{}'", saved.getId(), saved.getName());
         return mapToResponse(saved);
     }
 
