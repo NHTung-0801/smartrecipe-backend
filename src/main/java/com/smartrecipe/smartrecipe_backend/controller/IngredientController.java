@@ -1,6 +1,7 @@
 package com.smartrecipe.smartrecipe_backend.controller;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.IngredientRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.QuickIngredientRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.IngredientResponse;
 import com.smartrecipe.smartrecipe_backend.service.IngredientService;
@@ -49,10 +50,30 @@ public class IngredientController {
         return ResponseEntity.ok(ApiResponse.success(ingredient, "Chi tiết nguyên liệu!"));
     }
 
+    /**
+     * Tạo nguyên liệu đầy đủ (kèm dinh dưỡng + baseUnit) — chỉ ADMIN.
+     *
+     * <p>Phân quyền vì đây là đường ghi trực tiếp vào bảng nguyên liệu dùng chung:
+     * user thường ghi tự do sẽ làm bẩn dữ liệu dinh dưỡng và có thể đặt baseUnit
+     * ngoài 'g'/'ml' khiến chức năng quy đổi/trừ kho vỡ.
+     * User thường dùng {@code POST /api/v1/ingredients/quick} thay thế.
+     */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<IngredientResponse>> createIngredient(@Valid @RequestBody IngredientRequest request) {
         IngredientResponse ingredient = ingredientService.createIngredient(request);
         return new ResponseEntity<>(ApiResponse.success(ingredient, "Tạo nguyên liệu thành công!"), HttpStatus.CREATED);
+    }
+
+    /**
+     * Thêm nhanh nguyên liệu cho user đã đăng nhập: chỉ tên + kệ hàng.
+     * Server tự đặt baseUnit = 'g' và dinh dưỡng = 0 để admin kiểm duyệt sau.
+     */
+    @PostMapping("/quick")
+    public ResponseEntity<ApiResponse<IngredientResponse>> createQuickIngredient(
+            @Valid @RequestBody QuickIngredientRequest request) {
+        IngredientResponse ingredient = ingredientService.createQuickIngredient(request);
+        return new ResponseEntity<>(ApiResponse.success(ingredient, "Đã thêm nguyên liệu mới!"), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
