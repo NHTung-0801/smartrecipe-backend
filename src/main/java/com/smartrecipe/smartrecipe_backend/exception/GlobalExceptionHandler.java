@@ -43,6 +43,29 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(ApiResponse.error(ex.getMessage(), "BAD_REQUEST"), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRateLimitExceededException(RateLimitExceededException ex, WebRequest request) {
+        return new ResponseEntity<>(ApiResponse.error(ex.getMessage(), "TOO_MANY_REQUESTS"), HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    // Lỗi từ nhà cung cấp AI bên ngoài (timeout, 5xx, response sai cấu trúc).
+    // Trả 503 chứ không phải 400/500: request của user hợp lệ, chỉ cần thử lại.
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiServiceException(AiServiceException ex, WebRequest request) {
+        return new ResponseEntity<>(ApiResponse.error(ex.getMessage(), "AI_SERVICE_UNAVAILABLE"), HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    // @PreAuthorize từ chối -> phải là 403, không phải 500.
+    // Nếu không bắt riêng thì handler Exception ở cuối sẽ biến nó thành
+    // "Internal Server Error", frontend không phân biệt được thiếu quyền với lỗi thật.
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(
+            org.springframework.security.access.AccessDeniedException ex) {
+        return new ResponseEntity<>(
+                ApiResponse.error("Bạn không có quyền thực hiện hành động này", "FORBIDDEN"),
+                HttpStatus.FORBIDDEN);
+    }
+
     // Xử lý lỗi Validate (Bean Validation)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
