@@ -53,11 +53,16 @@ public class RecipeServiceImpl implements RecipeService {
         User author = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
+        // Nếu user gửi PUBLIC → chuyển sang PENDING_REVIEW (chờ Admin duyệt)
+        RecipeStatus finalStatus = request.getStatus() == RecipeStatus.PUBLIC
+                ? RecipeStatus.PENDING_REVIEW
+                : request.getStatus();
+
         Recipe recipe = Recipe.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .baseServings(request.getBaseServings())
-                .status(request.getStatus())
+                .status(finalStatus)
                 .imageUrl(request.getImageUrl())
                 .prepTime(request.getPrepTime())
                 .cookTime(request.getCookTime())
@@ -148,7 +153,12 @@ public class RecipeServiceImpl implements RecipeService {
         recipe.setTitle(request.getTitle());
         recipe.setDescription(request.getDescription());
         recipe.setBaseServings(request.getBaseServings());
-        recipe.setStatus(request.getStatus());
+        // Nếu user muốn chuyển sang PUBLIC → PENDING_REVIEW để admin duyệt
+        // Chỉ ADMIN (qua AdminController) mới được set trực tiếp PUBLIC
+        RecipeStatus updateStatus = request.getStatus() == RecipeStatus.PUBLIC
+                ? RecipeStatus.PENDING_REVIEW
+                : request.getStatus();
+        recipe.setStatus(updateStatus);
         recipe.setImageUrl(request.getImageUrl());
         recipe.setPrepTime(request.getPrepTime());
         recipe.setCookTime(request.getCookTime());
