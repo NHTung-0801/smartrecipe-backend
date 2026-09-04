@@ -123,4 +123,16 @@ public class UserServiceImpl implements UserService {
         
         return mapToResponse(updatedUser, username);
     }
+
+    @Override
+    public void deleteAccount(String username, String password) {
+        User user = getUserByUsername(username);
+
+        // Xác minh mật khẩu trước khi xóa — tránh xóa nhầm do click nhầm
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu không chính xác. Vui lòng nhập lại.");
+        }
+
+        userRepository.delete(user);
+    }
 }
