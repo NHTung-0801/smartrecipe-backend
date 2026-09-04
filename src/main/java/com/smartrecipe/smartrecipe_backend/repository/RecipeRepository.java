@@ -23,6 +23,11 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     long countByAuthorIdAndStatusNot(Long authorId, RecipeStatus status);
 
+    // Admin stats
+    long countByStatus(RecipeStatus status);
+
+    long countByStatusNot(RecipeStatus status);
+
     List<Recipe> findByClonedFromId(Long clonedFromId);
 
     @Query("SELECT r FROM Recipe r WHERE r.status = 'PUBLIC' AND " +
@@ -35,4 +40,10 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     @Query("SELECT r FROM Recipe r WHERE r.status = 'PUBLIC' AND r.author.id = :userId")
     Page<Recipe> findPublicByAuthorId(@Param("userId") Long userId, Pageable pageable);
+
+    // Admin recipe moderation
+    Page<Recipe> findByStatusOrderByCreatedAtDesc(RecipeStatus status, Pageable pageable);
+
+    @Query("SELECT r FROM Recipe r WHERE r.status IN (:statuses) ORDER BY r.createdAt DESC")
+    Page<Recipe> findByStatusIn(@Param("statuses") List<RecipeStatus> statuses, Pageable pageable);
 }

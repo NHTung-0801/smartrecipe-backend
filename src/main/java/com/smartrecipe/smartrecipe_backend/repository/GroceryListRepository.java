@@ -14,4 +14,5 @@ public interface GroceryListRepository extends JpaRepository<GroceryList, Long> 
     Optional<GroceryList> findByIdAndUserId(Long id, Long userId);
     Optional<GroceryList> findFirstByUserIdAndStatusOrderByCreatedAtDesc(
             Long userId, GroceryListStatus status);
+    long countByStatus(GroceryListStatus status);
 }
