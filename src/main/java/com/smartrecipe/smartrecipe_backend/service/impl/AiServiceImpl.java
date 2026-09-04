@@ -502,3 +502,16 @@ public class AiServiceImpl implements AiService {
         return aiLogRepository.save(logEntry);
     }
 }
+
+    /**
+     * Chuyển danh sách chuỗi thành JSON array string để lưu vào cột JSON của MySQL.
+     * Ví dụ: ["Thịt gà — 500 g ⚠️", "Cà rốt — 200 g"] → "[\"Thịt gà — 500 g ⚠️\",\"Cà rốt — 200 g\"]"
+     */
+    private String toJsonArray(List<String> items) {
+        try {
+            return objectMapper.writeValueAsString(items);
+        } catch (Exception e) {
+            // Fallback: JSON array với 1 phần tử là toàn bộ text
+            return "[\"" + String.join(", ", items).replace("\"", "'") + "\"]";
+        }
+    }
