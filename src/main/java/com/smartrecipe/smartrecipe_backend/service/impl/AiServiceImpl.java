@@ -184,6 +184,8 @@ public class AiServiceImpl implements AiService {
         String aiResponseJson = geminiClient.generate(SYSTEM_PROMPT, userPrompt);
 
         // 5. Parse & lưu log
+        // Serialize thành JSON array để MySQL JSON column chấp nhận
+        String inputJson = toJsonArray(ingredients);
         AiSuggestResponse response = parseAiResponse(aiResponseJson);
         AiSuggestionLog savedLog = saveLog(userId, AiSuggestionType.FEASIBLE_FINDER, inputText, aiResponseJson);
         response.setLogId(savedLog.getId());
