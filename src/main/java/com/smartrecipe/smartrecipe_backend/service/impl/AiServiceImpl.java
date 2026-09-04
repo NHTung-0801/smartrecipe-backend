@@ -68,6 +68,12 @@ public class AiServiceImpl implements AiService {
               "prepTime": 10,
               "cookTime": 15,
               "difficulty": "EASY",
+              "nutrition": {
+                "calories": 450,
+                "protein": 32,
+                "carbs": 28,
+                "fat": 18
+              },
               "ingredients": [
                 { "ingredientName": "Thịt bò", "amount": 200, "unit": "g" },
                 { "ingredientName": "Hành tây", "amount": 1, "unit": "củ" }
