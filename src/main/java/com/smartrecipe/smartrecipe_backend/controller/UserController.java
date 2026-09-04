@@ -60,4 +60,17 @@ public class UserController {
         UserProfileResponse profile = userService.getPublicUserProfile(id, currentUsername);
         return ResponseEntity.ok(ApiResponse.success(profile, "Lấy thông tin hồ sơ thành công"));
     }
+
+    /**
+     * Xóa tài khoản của chính user đang đăng nhập.
+     * Yêu cầu nhập mật khẩu để xác nhận — tránh xóa nhầm.
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(
+            Authentication authentication,
+            @RequestParam String password) {
+        String username = authentication.getName();
+        userService.deleteAccount(username, password);
+        return ResponseEntity.ok(ApiResponse.success(null, "Tài khoản đã được xóa thành công."));
+    }
 }
