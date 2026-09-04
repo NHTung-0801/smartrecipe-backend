@@ -157,7 +157,7 @@ public class AiServiceImpl implements AiService {
         // Chuyển plain-text thành JSON array để MySQL JSON column chấp nhận
         String inputJson = toJsonArray(ingredientTexts);
         AiSuggestResponse response = parseAiResponse(aiResponseJson);
-        AiSuggestionLog savedLog = saveLog(userId, AiSuggestionType.ZERO_WASTE, inputText, aiResponseJson);
+        AiSuggestionLog savedLog = saveLog(userId, AiSuggestionType.ZERO_WASTE, inputJson, aiResponseJson);
         response.setLogId(savedLog.getId());
         response.setCanSave(true);
 
@@ -187,7 +187,7 @@ public class AiServiceImpl implements AiService {
         // Serialize thành JSON array để MySQL JSON column chấp nhận
         String inputJson = toJsonArray(ingredients);
         AiSuggestResponse response = parseAiResponse(aiResponseJson);
-        AiSuggestionLog savedLog = saveLog(userId, AiSuggestionType.FEASIBLE_FINDER, inputText, aiResponseJson);
+        AiSuggestionLog savedLog = saveLog(userId, AiSuggestionType.FEASIBLE_FINDER, inputJson, aiResponseJson);
         response.setLogId(savedLog.getId());
         response.setCanSave(true);
 
