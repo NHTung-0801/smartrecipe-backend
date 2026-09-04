@@ -59,7 +59,8 @@ public class AiServiceImpl implements AiService {
             2. Có thể thêm gia vị cơ bản (muối, đường, dầu ăn, tỏi, hành...) nếu cần, nhưng KHÔNG thêm nguyên liệu chính ngoài danh sách.
             3. Công thức phải thực tế, dễ nấu tại nhà.
             4. Viết bằng tiếng Việt.
-            5. Trả về ĐÚNG định dạng JSON sau, KHÔNG thêm bất kỳ text nào ngoài JSON:
+            5. Ước tính dinh dưỡng cho TOÀN BỘ món ăn (tính theo baseServings khẩu phần).
+            6. Trả về ĐÚNG định dạng JSON sau, KHÔNG thêm bất kỳ text nào ngoài JSON:
             
             {
               "title": "Tên món ăn",
@@ -86,6 +87,7 @@ public class AiServiceImpl implements AiService {
             
             Lưu ý về giá trị "difficulty": chỉ được dùng 1 trong 3 giá trị: "EASY", "MEDIUM", "HARD".
             Lưu ý về "amount": phải là số (integer hoặc decimal), KHÔNG phải chuỗi.
+            Lưu ý về "nutrition": tất cả giá trị là số nguyên (kcal hoặc gram), ước tính cho toàn bộ món (baseServings người ăn).
             """;
 
     private final GeminiClient geminiClient;
@@ -511,7 +513,6 @@ public class AiServiceImpl implements AiService {
 
         return aiLogRepository.save(logEntry);
     }
-}
 
     /**
      * Chuyển danh sách chuỗi thành JSON array string để lưu vào cột JSON của MySQL.
@@ -525,3 +526,4 @@ public class AiServiceImpl implements AiService {
             return "[\"" + String.join(", ", items).replace("\"", "'") + "\"]";
         }
     }
+}
