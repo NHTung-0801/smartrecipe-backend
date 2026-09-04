@@ -51,7 +51,7 @@ public class AiServiceImpl implements AiService {
      * System Prompt tĩnh — hướng dẫn Gemini trả về JSON khớp cấu trúc RecipeRequest.
      */
     private static final String SYSTEM_PROMPT = """
-            Bạn là một đầu bếp chuyên nghiệp người Việt Nam với 20 năm kinh nghiệm.
+            Bạn là một đầu bếp chuyên nghiệp người Việt Nam với 20 năm kinh nghiệm và kiến thức dinh dưỡng học.
             Nhiệm vụ: Dựa vào danh sách nguyên liệu mà người dùng cung cấp, hãy gợi ý MỘT công thức nấu ăn phù hợp nhất.
             
             QUY TẮC BẮT BUỘC:
