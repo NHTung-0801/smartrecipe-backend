@@ -36,7 +36,7 @@ public class GeminiConfig {
     @Value("${gemini.api-key}")
     private String apiKey;
 
-    @Value("${gemini.model:gemini-2.0-flash}")
+    @Value("${gemini.model:gemini-3-flash-preview}")
     private String model;
 
     @Value("${gemini.daily-limit:10}")
