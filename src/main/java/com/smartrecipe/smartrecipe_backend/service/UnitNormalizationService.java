@@ -19,12 +19,20 @@ public class UnitNormalizationService {
     private static final MathContext CONTEXT = MathContext.DECIMAL128;
     private static final int MAX_HOPS = 4;
     private static final Map<String, String> ALIASES = Map.ofEntries(
+            // Mass
             Map.entry("g (gram)", "g"), Map.entry("gram", "g"), Map.entry("grams", "g"),
             Map.entry("kilogram", "kg"), Map.entry("kilograms", "kg"),
+            // Volume
             Map.entry("lit", "l"), Map.entry("litre", "l"), Map.entry("liter", "l"), Map.entry("liters", "l"),
+            // Spoon/Cup — with suffix (legacy)
             Map.entry("thia cafe (tsp)", "muong ca phe"), Map.entry("tsp", "muong ca phe"),
             Map.entry("thia canh (tbsp)", "muong canh"), Map.entry("tbsp", "muong canh"),
-            Map.entry("chen/bat", "chen"), Map.entry("qua/trai", "qua")
+            Map.entry("chen/bat", "chen"),
+            // Spoon/Cup — WITHOUT suffix (how units are actually stored in recipes)
+            Map.entry("thia cafe", "muong ca phe"),
+            Map.entry("thia canh", "muong canh"),
+            // Count units
+            Map.entry("qua/trai", "qua")
     );
 
     private final UnitConversionRepository conversionRepository;

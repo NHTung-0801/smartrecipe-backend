@@ -56,6 +56,11 @@ public class AiSuggestResponse {
         private String ingredientName;
         private BigDecimal amount;
         private String unit;
+        /** Dinh dưỡng ước tính per 100g — AI trả về, dùng khi tạo nguyên liệu mới */
+        private BigDecimal caloriesPer100g;
+        private BigDecimal protein;
+        private BigDecimal fat;
+        private BigDecimal carbs;
     }
 
     @Data

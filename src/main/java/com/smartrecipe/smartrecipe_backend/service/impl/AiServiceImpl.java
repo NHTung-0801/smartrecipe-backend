@@ -54,13 +54,14 @@ public class AiServiceImpl implements AiService {
             Bạn là một đầu bếp chuyên nghiệp người Việt Nam với 20 năm kinh nghiệm và kiến thức dinh dưỡng học.
             Nhiệm vụ: Dựa vào danh sách nguyên liệu mà người dùng cung cấp, hãy gợi ý MỘT công thức nấu ăn phù hợp nhất.
             
-            QUY TẮC BẮT BUỘC:
+            QUY TẮc BẮT BUỘC:
             1. Ưu tiên sử dụng TỐI ĐA các nguyên liệu được cung cấp, đặc biệt những nguyên liệu sắp hết hạn (nếu có ghi chú).
             2. Có thể thêm gia vị cơ bản (muối, đường, dầu ăn, tỏi, hành...) nếu cần, nhưng KHÔNG thêm nguyên liệu chính ngoài danh sách.
             3. Công thức phải thực tế, dễ nấu tại nhà.
             4. Viết bằng tiếng Việt.
-            5. Ước tính dinh dưỡng cho TOÀN BỘ món ăn (tính theo baseServings khẩu phần).
-            6. Trả về ĐÚNG định dạng JSON sau, KHÔNG thêm bất kỳ text nào ngoài JSON:
+            5. Ưc tính dinh dưỡng cho TOÀN BỘ món ăn (tính theo baseServings khẩu phần).
+            6. Với MỖI nguyên liệu trong mảng ingredients, hãy ước tính DINH DƯỢNG per 100g của nguyên liệu đó.
+            7. Trả về ĐÚNG định dạng JSON sau, KHÔNG thêm bất kỳ text nào ngoài JSON:
             
             {
               "title": "Tên món ăn",
@@ -76,8 +77,24 @@ public class AiServiceImpl implements AiService {
                 "fat": 18
               },
               "ingredients": [
-                { "ingredientName": "Thịt bò", "amount": 200, "unit": "g" },
-                { "ingredientName": "Hành tây", "amount": 1, "unit": "củ" }
+                {
+                  "ingredientName": "Thịt bò",
+                  "amount": 200,
+                  "unit": "g",
+                  "caloriesPer100g": 250,
+                  "protein": 26,
+                  "carbs": 0,
+                  "fat": 15
+                },
+                {
+                  "ingredientName": "Hành tây",
+                  "amount": 1,
+                  "unit": "củ",
+                  "caloriesPer100g": 40,
+                  "protein": 1,
+                  "carbs": 9,
+                  "fat": 0
+                }
               ],
               "steps": [
                 { "stepNumber": 1, "instruction": "Bước thực hiện chi tiết..." },
@@ -87,8 +104,10 @@ public class AiServiceImpl implements AiService {
             
             Lưu ý về giá trị "difficulty": chỉ được dùng 1 trong 3 giá trị: "EASY", "MEDIUM", "HARD".
             Lưu ý về "amount": phải là số (integer hoặc decimal), KHÔNG phải chuỗi.
-            Lưu ý về "nutrition": tất cả giá trị là số nguyên (kcal hoặc gram), ước tính cho toàn bộ món (baseServings người ăn).
+            Lưu ý về "nutrition" (cấp món): tất cả giá trị là số nguyên (kcal hoặc gram), ước tính cho toàn bộ món (baseServings người ăn).
+            Lưu ý về dinh dưỡng per-ingredient: caloriesPer100g, protein, carbs, fat đều là số nguyên, ước tính cho 100g nguyên liệu đó.
             """;
+
 
     private final GeminiClient geminiClient;
     private final GeminiConfig geminiConfig;
@@ -98,6 +117,7 @@ public class AiServiceImpl implements AiService {
     private final ObjectMapper objectMapper;
     private final IngredientRepository ingredientRepository;
     private final RecipeService recipeService;
+    private final com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
 
     public AiServiceImpl(GeminiClient geminiClient,
                          GeminiConfig geminiConfig,
@@ -107,6 +127,19 @@ public class AiServiceImpl implements AiService {
                          ObjectMapper objectMapper,
                          IngredientRepository ingredientRepository,
                          RecipeService recipeService) {
+        this(geminiClient, geminiConfig, pantryService, aiLogRepository, userRepository, objectMapper, ingredientRepository, recipeService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiServiceImpl(GeminiClient geminiClient,
+                         GeminiConfig geminiConfig,
+                         PantryService pantryService,
+                         AiSuggestionLogRepository aiLogRepository,
+                         UserRepository userRepository,
+                         ObjectMapper objectMapper,
+                         IngredientRepository ingredientRepository,
+                         RecipeService recipeService,
+                         com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService) {
         this.geminiClient = geminiClient;
         this.geminiConfig = geminiConfig;
         this.pantryService = pantryService;
@@ -115,6 +148,7 @@ public class AiServiceImpl implements AiService {
         this.objectMapper = objectMapper;
         this.ingredientRepository = ingredientRepository;
         this.recipeService = recipeService;
+        this.unitNormalizationService = unitNormalizationService;
     }
 
     // ===================== PUBLIC METHODS =====================
@@ -233,26 +267,39 @@ public class AiServiceImpl implements AiService {
             Ingredient matched = resolveIngredient(item.getIngredientName());
             if (matched != null) {
                 req.setIngredientId(matched.getId());
-                // Dùng baseUnit của nguyên liệu trong DB, không tin đơn vị AI trả về.
-                // 290 dòng seed đều là 'g'/'ml'; nếu giữ unit của AI (vd "củ", "quả")
-                // thì UnitNormalizationService.toBaseUnit() sẽ ném BadRequestException
-                // khi trừ kho, vì unit_conversions không có đường dẫn tới các đơn vị đó.
+                // Dùng baseUnit của nguyên liệu trong DB, nhưng PHẢI quy đổi số lượng (amount) sang baseUnit
+                // nếu đơn vị của AI khác với baseUnit (ví dụ: "2 quả cà chua" -> 200g, "1 muỗng cà phê" -> 5g).
+                BigDecimal amount = item.getAmount();
+                if (item.getUnit() != null && !item.getUnit().equalsIgnoreCase(matched.getBaseUnit())
+                        && unitNormalizationService != null) {
+                    try {
+                        amount = unitNormalizationService.toBaseUnit(item.getAmount(), item.getUnit(), matched);
+                    } catch (Exception e) {
+                        log.warn("Không thể quy đổi đơn vị '{}' sang '{}' cho '{}': {}",
+                                item.getUnit(), matched.getBaseUnit(), matched.getName(), e.getMessage());
+                    }
+                }
+                req.setAmount(amount);
                 req.setUnit(matched.getBaseUnit());
             } else {
-                // Chưa có trong DB -> tạo mới với dinh dưỡng = 0 làm cờ chờ kiểm duyệt.
+                // Chưa có trong DB -> tạo mới với dinh dưỡng từ AI (để không làm sai tính toán).
                 // baseUnit luôn 'g': đơn vị AI trả về ("củ", "quả", "muỗng") không nằm
                 // trong unit_conversions nên sẽ làm chức năng trừ kho vỡ về sau.
+                BigDecimal cal = item.getCaloriesPer100g() != null ? item.getCaloriesPer100g() : BigDecimal.ZERO;
+                BigDecimal pro = item.getProtein() != null ? item.getProtein() : BigDecimal.ZERO;
+                BigDecimal fat = item.getFat() != null ? item.getFat() : BigDecimal.ZERO;
+                BigDecimal carb = item.getCarbs() != null ? item.getCarbs() : BigDecimal.ZERO;
                 Ingredient newIngredient = Ingredient.builder()
                         .name(item.getIngredientName().trim())
                         .baseUnit("g")
-                        .caloriesPer100g(BigDecimal.ZERO)
-                        .protein(BigDecimal.ZERO)
-                        .fat(BigDecimal.ZERO)
-                        .carbs(BigDecimal.ZERO)
+                        .caloriesPer100g(cal)
+                        .protein(pro)
+                        .fat(fat)
+                        .carbs(carb)
                         .build();
                 Ingredient savedIngredient = ingredientRepository.save(newIngredient);
-                log.warn("AI tạo nguyên liệu mới chưa có dinh dưỡng: id={} name='{}'",
-                        savedIngredient.getId(), savedIngredient.getName());
+                log.warn("AI tạo nguyên liệu mới chưa có trong DB: id={} name='{}' cal={} pro={} fat={} carb={}",
+                        savedIngredient.getId(), savedIngredient.getName(), cal, pro, fat, carb);
                 req.setIngredientId(savedIngredient.getId());
                 req.setUnit("g");
             }
