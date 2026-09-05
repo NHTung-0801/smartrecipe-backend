@@ -90,7 +90,7 @@ public class IngredientServiceImpl implements IngredientService {
 
         Ingredient ingredient = Ingredient.builder()
                 .name(request.getName().trim())
-                .baseUnit(request.getBaseUnit())
+                .baseUnit(normalizeBaseUnit(request.getBaseUnit()))
                 .caloriesPer100g(request.getCaloriesPer100g())
                 .protein(request.getProtein())
                 .fat(request.getFat())
@@ -155,7 +155,7 @@ public class IngredientServiceImpl implements IngredientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nguyên liệu với ID: " + id));
 
         ingredient.setName(request.getName());
-        ingredient.setBaseUnit(request.getBaseUnit());
+        ingredient.setBaseUnit(normalizeBaseUnit(request.getBaseUnit()));
         ingredient.setCaloriesPer100g(request.getCaloriesPer100g());
         ingredient.setProtein(request.getProtein());
         ingredient.setFat(request.getFat());
@@ -218,5 +218,52 @@ public class IngredientServiceImpl implements IngredientService {
                 .carbs(ingredient.getCarbs())
                 .aisle(aisleResponse)
                 .build();
+    }
+
+    /**
+     * Đảm bảo baseUnit của nguyên liệu luôn là 'g' hoặc 'ml'.
+     * - Đơn vị thể tích (ml, l, lít...) → 'ml'
+     * - Đơn vị khối lượng / đếm / thìa (g, kg, thìa, chén, quả...) → 'g'
+     * - Đơn vị không rõ → 'g' (fallback an toàn)
+     *
+     * Lưu ý: đây chỉ áp dụng cho baseUnit của NGUYÊN LIỆU, không phải
+     * đơn vị dùng trong công thức. Nguyên liệu lỏng (nước mắm, dầu ăn...)
+     * nên được Admin lưu với baseUnit = 'ml'.
+     */
+    private String normalizeBaseUnit(String rawUnit) {
+        if (rawUnit == null || rawUnit.isBlank()) return "g";
+        String u = java.text.Normalizer
+                .normalize(rawUnit.trim().toLowerCase(java.util.Locale.ROOT),
+                        java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd');
+
+        // === Đơn vị hợp lệ — giữ nguyên ===
+        if (u.equals("g") || u.equals("gram") || u.equals("grams")) return "g";
+        if (u.equals("ml") || u.equals("milliliter") || u.equals("millilitre")) return "ml";
+
+        // === Thể tích → ml ===
+        if (u.equals("l") || u.equals("lit") || u.contains("liter") || u.contains("litre")) return "ml";
+
+        // === Khối lượng lớn → g ===
+        if (u.equals("kg") || u.equals("kilogram") || u.equals("kilograms")) return "g";
+
+        // === Đơn vị thìa / chén (solid) → g ===
+        // Lưu ý: nếu muốn dùng cho chất lỏng, Admin hãy chọn 'ml' trực tiếp
+        if (u.contains("thia cafe") || u.contains("muong ca phe") || u.contains("tsp")) return "g";
+        if (u.contains("thia canh") || u.contains("muong canh") || u.contains("tbsp")) return "g";
+        if (u.contains("chen") || u.contains("cup")) return "g";
+
+        // === Đơn vị đếm → g ===
+        if (u.equals("qua") || u.equals("trai")) return "g";
+        if (u.equals("cu")) return "g";
+        if (u.equals("tep")) return "g";
+        if (u.equals("bo")) return "g";
+        if (u.equals("con")) return "g";
+        if (u.equals("lat")) return "g";
+
+        // === Fallback ===
+        log.warn("[IngredientService] BaseUnit '{}' không nhận dạng được, mặc định = 'g'", rawUnit);
+        return "g";
     }
 }

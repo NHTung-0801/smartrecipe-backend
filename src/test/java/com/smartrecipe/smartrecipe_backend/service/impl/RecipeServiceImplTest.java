@@ -40,6 +40,7 @@ class RecipeServiceImplTest {
     @Mock TagRepository tagRepository;
     @Mock CloudinaryService cloudinaryService;
     @Mock CookingJournalRepository cookingJournalRepository;
+    @Mock com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
 
     private RecipeServiceImpl service;
     private User owner;
@@ -58,7 +59,8 @@ class RecipeServiceImplTest {
                 ingredientRepository,
                 tagRepository,
                 cloudinaryService,
-                cookingJournalRepository);
+                cookingJournalRepository,
+                unitNormalizationService);
         owner = User.builder().id(1L).username("owner").build();
         otherUser = User.builder().id(2L).username("other").build();
     }

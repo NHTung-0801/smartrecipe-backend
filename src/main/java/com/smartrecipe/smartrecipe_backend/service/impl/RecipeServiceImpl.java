@@ -45,6 +45,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final TagRepository tagRepository;
     private final CloudinaryService cloudinaryService;
     private final CookingJournalRepository cookingJournalRepository;
+    private final com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
 
     // ==================== CRUD ====================
 
@@ -566,23 +567,38 @@ public class RecipeServiceImpl implements RecipeService {
         BigDecimal totalFat = BigDecimal.ZERO;
         BigDecimal totalCarbs = BigDecimal.ZERO;
 
-        for (RecipeIngredient ri : recipe.getIngredients()) {
-            Ingredient ing = ri.getIngredient();
-            if (ing == null) continue;
+        if (recipe.getIngredients() != null) {
+            for (RecipeIngredient ri : recipe.getIngredients()) {
+                Ingredient ing = ri.getIngredient();
+                if (ing == null || ri.getAmount() == null) continue;
 
-            // Quy đổi amount về gram nếu cần (đơn giản: giả sử input là grams)
-            BigDecimal amountInGrams = ri.getAmount();
-            if (!"g".equalsIgnoreCase(ri.getUnit()) && !"gram".equalsIgnoreCase(ri.getUnit())) {
-                // Mặc định coi 1 unit = 100g nếu không rõ (có thể mở rộng dùng UnitConversion sau)
-                amountInGrams = ri.getAmount().multiply(new BigDecimal("100"));
+                // Quy đổi amount về gram
+                BigDecimal amountInGrams = ri.getAmount();
+                if (ri.getUnit() != null && !"g".equalsIgnoreCase(ri.getUnit()) && !"gram".equalsIgnoreCase(ri.getUnit())) {
+                    if (unitNormalizationService != null) {
+                        try {
+                            amountInGrams = unitNormalizationService.toBaseUnit(ri.getAmount(), ri.getUnit(), ing);
+                        } catch (Exception e) {
+                            // Mặc định coi 1 unit = 100g nếu không có quy đổi cụ thể
+                            amountInGrams = ri.getAmount().multiply(new BigDecimal("100"));
+                        }
+                    } else {
+                        amountInGrams = ri.getAmount().multiply(new BigDecimal("100"));
+                    }
+                }
+
+                BigDecimal ratio = amountInGrams.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+
+                BigDecimal cal = ing.getCaloriesPer100g() != null ? ing.getCaloriesPer100g() : BigDecimal.ZERO;
+                BigDecimal pro = ing.getProtein() != null ? ing.getProtein() : BigDecimal.ZERO;
+                BigDecimal fat = ing.getFat() != null ? ing.getFat() : BigDecimal.ZERO;
+                BigDecimal carb = ing.getCarbs() != null ? ing.getCarbs() : BigDecimal.ZERO;
+
+                totalCalories = totalCalories.add(cal.multiply(ratio));
+                totalProtein = totalProtein.add(pro.multiply(ratio));
+                totalFat = totalFat.add(fat.multiply(ratio));
+                totalCarbs = totalCarbs.add(carb.multiply(ratio));
             }
-
-            BigDecimal ratio = amountInGrams.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
-
-            totalCalories = totalCalories.add(ing.getCaloriesPer100g().multiply(ratio));
-            totalProtein = totalProtein.add(ing.getProtein().multiply(ratio));
-            totalFat = totalFat.add(ing.getFat().multiply(ratio));
-            totalCarbs = totalCarbs.add(ing.getCarbs().multiply(ratio));
         }
 
         int servings = recipe.getBaseServings() != null && recipe.getBaseServings() > 0 ? recipe.getBaseServings() : 1;
