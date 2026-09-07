@@ -1,0 +1,61 @@
+name: Backend CD — Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+# Chỉ chạy sau khi CI pass
+# GitHub Actions tự động serialize: CI workflow phải hoàn thành trước
+# Nếu muốn enforce dependency chặt hơn, dùng workflow_run trigger
+
+jobs:
+  deploy:
+    name: Deploy to Render (Deploy Hook)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        run: |
+          echo "🚀 Triggering Render deploy for smartrecipe-backend..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          echo "Render response code: $response"
+          if [ "$response" != "200" ] && [ "$response" != "201" ]; then
+            echo "❌ Failed to trigger Render deploy (HTTP $response)"
+            exit 1
+          fi
+          echo "✅ Render deploy triggered successfully"
+
+      - name: Wait for Render to build and start
+        run: |
+          echo "⏳ Waiting for Render to build (up to 10 minutes)..."
+          max_attempts=20
+          attempt=0
+          health_url="${{ secrets.BACKEND_HEALTH_URL }}"
+
+          while [ $attempt -lt $max_attempts ]; do
+            attempt=$((attempt + 1))
+            echo "Health check attempt $attempt/$max_attempts..."
+
+            http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 \
+              --max-time 15 \
+              "$health_url" 2>/dev/null || echo "000")
+
+            if [ "$http_code" = "200" ]; then
+              echo "✅ Backend is healthy! (HTTP 200)"
+              exit 0
+            fi
+
+            echo "  → Response: HTTP $http_code — waiting 30s..."
+            sleep 30
+          done
+
+          echo "❌ Backend health check failed after $((max_attempts * 30)) seconds"
+          exit 1
+
+      - name: Deployment successful
+        run: |
+          echo "🎉 Backend deployed successfully to Render!"
+          echo "   Health URL: ${{ secrets.BACKEND_HEALTH_URL }}"

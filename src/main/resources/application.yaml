@@ -1,12 +1,14 @@
 spring:
   application:
     name: smartrecipe-backend
-  
-  # Database Configuration (Chạy trực tiếp ở local sẽ gọi vào port 3306 của Docker)
+
+  # Database Configuration
+  # Local: đọc từ .env hoặc dùng default localhost
+  # Production (Render): đọc từ Environment Variables
   datasource:
-    url: "jdbc:mysql://localhost:3306/smart_recipe_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
-    username: root
-    password: root
+    url: "${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/smart_recipe_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}"
+    username: "${SPRING_DATASOURCE_USERNAME:root}"
+    password: "${SPRING_DATASOURCE_PASSWORD:root}"
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       connection-init-sql: "SET NAMES utf8mb4"
@@ -22,10 +24,15 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
 
   # Redis Configuration
+  # Local: localhost:6379 (Docker)
+  # Production (Render): Upstash Redis với SSL
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: "${SPRING_DATA_REDIS_HOST:localhost}"
+      port: "${SPRING_DATA_REDIS_PORT:6379}"
+      password: "${SPRING_DATA_REDIS_PASSWORD:}"
+      ssl:
+        enabled: "${SPRING_DATA_REDIS_SSL_ENABLED:false}"
 
 app:
   jwt:
@@ -39,6 +46,11 @@ gemini:
   model: ${GEMINI_MODEL:gemini-3-flash-preview}
   daily-limit: 10
 
+# Cloudinary (Image Upload)
+# CLOUDINARY_URL được đọc trực tiếp bởi CloudinaryConfig.java qua @Value("${CLOUDINARY_URL}")
+# Không cần khai báo thêm trong yaml — chỉ cần set env var CLOUDINARY_URL trên Render
+# Format: cloudinary://<api_key>:<api_secret>@<cloud_name>
+
 server:
   port: 8080
   servlet:
@@ -48,3 +60,13 @@ server:
       force: true
       force-response: true
 
+# Spring Boot Actuator — expose health endpoint cho CI/CD health check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never

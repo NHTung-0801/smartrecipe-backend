@@ -1,0 +1,39 @@
+# Test profile — dùng cho CI/CD GitHub Actions
+# Mục đích: cho phép mvn test chạy mà không cần MySQL hoặc Redis thật
+# 37 Mockito tests hoàn toàn isolated, không cần DB connection
+# BackendApplicationTests bị exclude bởi CI workflow
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    secret: test-secret-key-for-ci-only-not-production
+    expirationMs: 86400000
+    refreshExpirationMs: 604800000
+
+gemini:
+  api-key: test-api-key-ci
+  model: gemini-test
+  daily-limit: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

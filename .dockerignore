@@ -1,0 +1,28 @@
+# Build output (được build lại bên trong Docker — không cần copy vào)
+target/
+
+# Local env files — KHÔNG bao giờ đưa vào Docker image
+.env
+.env.*
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+HELP.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker files (không cần thiết trong build context)
+.docker/

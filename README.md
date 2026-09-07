@@ -511,4 +511,59 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 ---
 
+## 🐳 Docker
+
+Dockerfile multi-stage nằm ở root thư mục backend:
+
+```bash
+# Build image
+docker build -t smartrecipe-backend .
+
+# Chạy container
+docker run -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=... \
+  -e GEMINI_API_KEY=... \
+  -e CLOUDINARY_URL=... \
+  smartrecipe-backend
+```
+
+| Stage | Base Image | Mục đích |
+|---|---|---|
+| builder | `eclipse-temurin:21-jdk` | Build JAR với Maven |
+| runtime | `eclipse-temurin:21-jre` | Chạy ứng dụng (image nhỏ gọn hơn) |
+
+> **Production:** Render tự động build từ `Dockerfile` khi có commit mới lên `main`.
+
+---
+
+## 🔄 CI/CD (GitHub Actions)
+
+Pipeline tự động gồm 2 workflow trong `.github/workflows/`:
+
+### `ci-backend.yml` — Chạy khi push bất kỳ branch
+1. Setup JDK 21 (Temurin)
+2. Cache Maven dependencies
+3. Chạy **37 unit tests** Mockito (không cần DB/Redis)
+4. Build JAR production
+5. Upload JAR artifact
+
+### `cd-backend.yml` — Chạy khi push `main` (sau CI pass)
+1. Trigger **Render Deploy Hook** (Cách B — kiểm soát)
+2. Retry health check `/actuator/health` tối đa 10 phút
+3. Thông báo deploy thành công/thất bại
+
+**GitHub Secrets cần cấu hình:**
+
+| Secret | Lấy từ đâu |
+|---|---|
+| `RENDER_DEPLOY_HOOK_URL` | Render Dashboard → Settings → Deploy Hooks |
+| `BACKEND_HEALTH_URL` | `https://<app>.onrender.com/actuator/health` |
+
+```bash
+# Chạy unit tests thủ công (giống CI)
+./mvnw test -Dtest="!BackendApplicationTests"
+```
+
+---
+
 *Xây dựng với ❤️ — SmartRecipe Backend v0.0.1*
