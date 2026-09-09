@@ -39,19 +39,14 @@ public class UserServiceImpl implements UserService {
         long recipeCount = 0;
         boolean isFollowing = false;
         
-        if (currentUsername != null && currentUsername.equals(user.getUsername())) {
-            // Xem profile của chính mình: đếm tất cả công thức (trừ DELETED)
-            recipeCount = recipeRepository.countByAuthorIdAndStatusNot(user.getId(), RecipeStatus.DELETED);
-        } else {
-            // Xem profile người khác: chỉ đếm công thức PUBLIC
-            recipeCount = recipeRepository.countByAuthorIdAndStatus(user.getId(), RecipeStatus.PUBLIC);
-            
-            // Kiểm tra xem currentUsername đã follow user này chưa
-            if (currentUsername != null) {
-                User currentUser = userRepository.findByUsername(currentUsername).orElse(null);
-                if (currentUser != null) {
-                    isFollowing = followRepository.existsByFollowerIdAndFollowingId(currentUser.getId(), user.getId());
-                }
+        // Đếm số công thức PUBLIC đã đóng góp cho cộng đồng (áp dụng cho cả trang cá nhân và trang công khai)
+        recipeCount = recipeRepository.countByAuthorIdAndStatus(user.getId(), RecipeStatus.PUBLIC);
+        
+        if (currentUsername != null && !currentUsername.equals(user.getUsername())) {
+            // Kiểm tra xem currentUsername đã follow user này chưa (khi xem profile người khác)
+            User currentUser = userRepository.findByUsername(currentUsername).orElse(null);
+            if (currentUser != null) {
+                isFollowing = followRepository.existsByFollowerIdAndFollowingId(currentUser.getId(), user.getId());
             }
         }
 
