@@ -61,8 +61,12 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/public").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/search").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}/comments").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/recipes/*/comments").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/user/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}/export/word").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/{id:\\d+}/profile").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/profile").permitAll()
                     .requestMatchers("/actuator/health").permitAll() // CI/CD health check
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()
