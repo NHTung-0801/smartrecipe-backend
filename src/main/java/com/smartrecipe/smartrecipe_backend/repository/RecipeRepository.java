@@ -30,9 +30,20 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     List<Recipe> findByClonedFromId(Long clonedFromId);
 
-    @Query("SELECT r FROM Recipe r WHERE r.status = 'PUBLIC' AND " +
+    @Query(value = "SELECT DISTINCT r FROM Recipe r " +
+           "LEFT JOIN r.tags rt " +
+           "LEFT JOIN rt.tag t " +
+           "WHERE r.status = 'PUBLIC' AND " +
            "(:keyword IS NULL OR LOWER(r.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(r.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+           "OR LOWER(r.description) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(t.name) LIKE LOWER(CONCAT('%', :keyword, '%')))",
+           countQuery = "SELECT COUNT(DISTINCT r) FROM Recipe r " +
+           "LEFT JOIN r.tags rt " +
+           "LEFT JOIN rt.tag t " +
+           "WHERE r.status = 'PUBLIC' AND " +
+           "(:keyword IS NULL OR LOWER(r.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(r.description) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(t.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Recipe> searchPublicRecipes(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT r FROM Recipe r WHERE r.author.id = :userId ORDER BY r.createdAt DESC")

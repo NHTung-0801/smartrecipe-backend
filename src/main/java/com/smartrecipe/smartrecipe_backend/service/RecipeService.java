@@ -8,6 +8,8 @@ import com.smartrecipe.smartrecipe_backend.dto.response.RecipeSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface RecipeService {
 
     // CRUD
@@ -27,6 +29,7 @@ public interface RecipeService {
     Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size);
 
     // Public Recipes (Explore)
+    Page<RecipeSummaryResponse> getPublicRecipes(int page, int size, String sortBy);
     Page<RecipeSummaryResponse> getPublicRecipes(int page, int size);
 
     // Search
@@ -42,6 +45,8 @@ public interface RecipeService {
     void likeRecipe(Long recipeId, Long userId);
 
     void unlikeRecipe(Long recipeId, Long userId);
+
+    List<Long> getLikedRecipeIds(Long userId);
 
     // Upload image
     ImageUploadResponse uploadRecipeImage(Long recipeId, MultipartFile file, Long userId);

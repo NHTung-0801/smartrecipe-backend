@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/recipes")
@@ -111,8 +112,9 @@ public class RecipeController {
     @GetMapping("/public")
     public ResponseEntity<Page<RecipeSummaryResponse>> getPublicRecipes(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Page<RecipeSummaryResponse> response = recipeService.getPublicRecipes(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy) {
+        Page<RecipeSummaryResponse> response = recipeService.getPublicRecipes(page, size, sortBy);
         return ResponseEntity.ok(response);
     }
 
@@ -177,6 +179,12 @@ public class RecipeController {
         Long userId = getUserId(principal);
         recipeService.unlikeRecipe(id, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/liked-ids")
+    public ResponseEntity<List<Long>> getLikedRecipeIds(Principal principal) {
+        Long userId = getUserId(principal);
+        return ResponseEntity.ok(recipeService.getLikedRecipeIds(userId));
     }
 
     // ==================== UPLOAD IMAGE ====================

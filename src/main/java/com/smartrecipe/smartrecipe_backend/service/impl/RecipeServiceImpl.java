@@ -287,10 +287,19 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<RecipeSummaryResponse> getPublicRecipes(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    public Page<RecipeSummaryResponse> getPublicRecipes(int page, int size, String sortBy) {
+        Sort sort = "likeCount".equalsIgnoreCase(sortBy)
+                ? Sort.by(Sort.Direction.DESC, "likeCount").and(Sort.by(Sort.Direction.DESC, "createdAt"))
+                : Sort.by(Sort.Direction.DESC, "createdAt");
+        Pageable pageable = PageRequest.of(page, size, sort);
         return recipeRepository.findByStatus(RecipeStatus.PUBLIC, pageable)
                 .map(this::mapToSummaryResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<RecipeSummaryResponse> getPublicRecipes(int page, int size) {
+        return getPublicRecipes(page, size, "createdAt");
     }
 
     @Override
@@ -414,6 +423,12 @@ public class RecipeServiceImpl implements RecipeService {
             recipe.setLikeCount(Math.max(0, recipe.getLikeCount() - 1));
             recipeRepository.save(recipe);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getLikedRecipeIds(Long userId) {
+        return recipeLikeRepository.findLikedRecipeIdsByUserId(userId);
     }
 
     // ==================== UPLOAD IMAGE ====================
