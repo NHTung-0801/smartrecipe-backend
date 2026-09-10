@@ -6,18 +6,22 @@ import com.smartrecipe.smartrecipe_backend.dto.response.CommentResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Recipe;
 import com.smartrecipe.smartrecipe_backend.entity.RecipeComment;
 import com.smartrecipe.smartrecipe_backend.entity.User;
+import com.smartrecipe.smartrecipe_backend.enums.NotificationType;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.RecipeCommentRepository;
 import com.smartrecipe.smartrecipe_backend.repository.RecipeRepository;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.service.CommentService;
+import com.smartrecipe.smartrecipe_backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -26,6 +30,7 @@ public class CommentServiceImpl implements CommentService {
     private final RecipeCommentRepository commentRepository;
     private final RecipeRepository recipeRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,13 +64,42 @@ public class CommentServiceImpl implements CommentService {
                 .build();
 
         // Nếu có parentId -> reply
+        RecipeComment parentComment = null;
         if (request.getParentId() != null) {
-            RecipeComment parentComment = commentRepository.findById(request.getParentId())
+            parentComment = commentRepository.findById(request.getParentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bình luận cha với id: " + request.getParentId()));
             comment.setParent(parentComment);
         }
 
         RecipeComment savedComment = commentRepository.save(comment);
+
+        // Gửi thông báo an toàn (không làm gián đoạn việc tạo bình luận nếu có lỗi)
+        try {
+            if (parentComment != null && parentComment.getUser() != null) {
+                // Reply bình luận: gửi thông báo đến tác giả của bình luận cha
+                notificationService.createNotification(
+                        parentComment.getUser(),
+                        user,
+                        recipe,
+                        savedComment,
+                        NotificationType.COMMENT_REPLY,
+                        user.getDisplayName() + " đã trả lời bình luận của bạn trong công thức \"" + recipe.getTitle() + "\""
+                );
+            } else if (recipe.getAuthor() != null) {
+                // Bình luận công thức gốc: gửi thông báo đến tác giả công thức
+                notificationService.createNotification(
+                        recipe.getAuthor(),
+                        user,
+                        recipe,
+                        savedComment,
+                        NotificationType.RECIPE_COMMENT,
+                        user.getDisplayName() + " đã bình luận về công thức \"" + recipe.getTitle() + "\" của bạn"
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Không thể tạo thông báo cho bình luận {}: {}", savedComment.getId(), e.getMessage());
+        }
+
         return mapToCommentResponse(savedComment);
     }
 
