@@ -14,6 +14,7 @@ public class UserProfileResponse {
     private String displayName;
     private String avatarUrl;
     private String bio;
+    private String role; // Trả về role để frontend hiển thị đúng quyền hạn (ADMIN/USER)
     
     // Các trường thống kê
     private Integer recipeCount;

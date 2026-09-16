@@ -57,6 +57,7 @@ public class UserServiceImpl implements UserService {
                 .displayName(user.getDisplayName())
                 .avatarUrl(user.getAvatarUrl())
                 .bio(user.getBio())
+                .role(user.getRole() != null ? user.getRole().name() : "USER") // Luôn trả về role
                 .recipeCount((int) recipeCount)
                 .followerCount(followerCount)
                 .followingCount(followingCount)
