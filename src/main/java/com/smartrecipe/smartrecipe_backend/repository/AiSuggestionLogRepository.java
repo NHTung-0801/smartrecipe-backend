@@ -1,6 +1,9 @@
 package com.smartrecipe.smartrecipe_backend.repository;
 
 import com.smartrecipe.smartrecipe_backend.entity.AiSuggestionLog;
+import com.smartrecipe.smartrecipe_backend.enums.AiSuggestionType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +14,16 @@ import java.util.List;
 
 @Repository
 public interface AiSuggestionLogRepository extends JpaRepository<AiSuggestionLog, Long> {
+
+    /**
+     * Lấy toàn bộ nhật ký AI phân trang theo thời gian mới nhất (Dành cho Admin).
+     */
+    Page<AiSuggestionLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * Lấy nhật ký AI theo loại gợi ý phân trang (Dành cho Admin).
+     */
+    Page<AiSuggestionLog> findByTypeOrderByCreatedAtDesc(AiSuggestionType type, Pageable pageable);
 
     /**
      * Đếm số lượt gọi AI của một user từ một thời điểm trở đi.

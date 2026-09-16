@@ -3,9 +3,15 @@ package com.smartrecipe.smartrecipe_backend.controller;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Ingredient;
 import com.smartrecipe.smartrecipe_backend.entity.Recipe;
+import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.enums.Difficulty;
 import com.smartrecipe.smartrecipe_backend.enums.GroceryListStatus;
 import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartrecipe.smartrecipe_backend.entity.AiSuggestionLog;
+import com.smartrecipe.smartrecipe_backend.enums.AiSuggestionType;
+import com.smartrecipe.smartrecipe_backend.enums.Role;
+import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +44,8 @@ public class AdminController {
     private final PantryRepository pantryRepository;
     private final CookingJournalRepository cookingJournalRepository;
     private final AisleRepository aisleRepository;
+    private final FollowRepository followRepository;
+    private final ObjectMapper objectMapper;
 
     // ==================== DASHBOARD STATS ====================
 
@@ -460,5 +469,261 @@ public class AdminController {
             throw new ResourceNotFoundException("Không tìm thấy nguyên liệu ID: " + id);
         ingredientRepository.deleteById(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa nguyên liệu"));
+    }
+
+    // ==================== USER MANAGEMENT ====================
+
+    /**
+     * Danh sách người dùng có phân trang, tìm kiếm và lọc theo Role
+     */
+    @GetMapping("/users")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAdminUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ALL") String role) {
+
+        Role roleFilter = null;
+        if (role != null && !role.equalsIgnoreCase("ALL") && !role.isBlank()) {
+            try {
+                roleFilter = Role.valueOf(role.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        String keyword = search != null ? search.trim() : null;
+        Page<User> userPage = userRepository.findAdminUsers(roleFilter, keyword, pageable);
+
+        List<Map<String, Object>> items = userPage.getContent().stream().map(u -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", u.getId());
+            item.put("username", u.getUsername());
+            item.put("displayName", u.getDisplayName());
+            item.put("email", u.getEmail());
+            item.put("role", u.getRole() != null ? u.getRole().name() : "USER");
+            item.put("avatarUrl", u.getAvatarUrl());
+            item.put("bio", u.getBio());
+            item.put("createdAt", u.getCreatedAt());
+            item.put("updatedAt", u.getUpdatedAt());
+            // Chỉ số hoạt động thực tế
+            item.put("recipeCount", recipeRepository.countByAuthorIdAndStatusNot(u.getId(), RecipeStatus.DELETED));
+            item.put("journalCount", cookingJournalRepository.countByUserId(u.getId()));
+            return item;
+        }).toList();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("content", items);
+        response.put("totalElements", userPage.getTotalElements());
+        response.put("totalPages", userPage.getTotalPages());
+        response.put("currentPage", page);
+
+        // KPI Counts
+        long totalUsers = userRepository.count();
+        long adminCount = userRepository.countByRole(Role.ADMIN);
+        long userCount = userRepository.countByRole(Role.USER);
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        long newUsersThisWeek = userRepository.countByCreatedAtAfter(sevenDaysAgo);
+
+        response.put("totalUsers", totalUsers);
+        response.put("adminCount", adminCount);
+        response.put("userCount", userCount);
+        response.put("newUsersThisWeek", newUsersThisWeek);
+
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách người dùng thành công"));
+    }
+
+    /**
+     * Chi tiết người dùng (Admin xem hồ sơ, thống kê & công thức gần đây)
+     */
+    @GetMapping("/users/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAdminUserDetail(@PathVariable Long id) {
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng ID: " + id));
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("id", u.getId());
+        detail.put("username", u.getUsername());
+        detail.put("displayName", u.getDisplayName());
+        detail.put("email", u.getEmail());
+        detail.put("role", u.getRole() != null ? u.getRole().name() : "USER");
+        detail.put("avatarUrl", u.getAvatarUrl());
+        detail.put("bio", u.getBio());
+        detail.put("createdAt", u.getCreatedAt());
+        detail.put("updatedAt", u.getUpdatedAt());
+
+        // Thống kê liên quan
+        long recipeCount = recipeRepository.countByAuthorIdAndStatusNot(id, RecipeStatus.DELETED);
+        long publicRecipeCount = recipeRepository.countByAuthorIdAndStatus(id, RecipeStatus.PUBLIC);
+        long journalCount = cookingJournalRepository.countByUserId(id);
+        long followerCount = followRepository.countByFollowingId(id);
+        long followingCount = followRepository.countByFollowerId(id);
+
+        detail.put("recipeCount", recipeCount);
+        detail.put("publicRecipeCount", publicRecipeCount);
+        detail.put("journalCount", journalCount);
+        detail.put("followerCount", followerCount);
+        detail.put("followingCount", followingCount);
+
+        // Top 5 công thức gần nhất của người dùng
+        List<Recipe> recentRecipes = recipeRepository.findRecentByUserId(id, PageRequest.of(0, 5));
+        List<Map<String, Object>> recipeItems = recentRecipes.stream().map(r -> {
+            Map<String, Object> rItem = new LinkedHashMap<>();
+            rItem.put("id", r.getId());
+            rItem.put("title", r.getTitle());
+            rItem.put("imageUrl", r.getImageUrl());
+            rItem.put("status", r.getStatus() != null ? r.getStatus().name() : null);
+            rItem.put("difficulty", r.getDifficulty() != null ? r.getDifficulty().name() : null);
+            rItem.put("likeCount", r.getLikeCount());
+            rItem.put("createdAt", r.getCreatedAt());
+            return rItem;
+        }).toList();
+        detail.put("recentRecipes", recipeItems);
+
+        return ResponseEntity.ok(ApiResponse.success(detail, "Lấy chi tiết người dùng thành công"));
+    }
+
+    /**
+     * Cập nhật quyền hạn (Role: USER <-> ADMIN)
+     */
+    @PatchMapping("/users/{id}/role")
+    public ResponseEntity<ApiResponse<Void>> updateUserRole(
+            @PathVariable Long id,
+            @RequestParam String role,
+            java.security.Principal principal) {
+
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng ID: " + id));
+
+        Role newRole;
+        try {
+            newRole = Role.valueOf(role.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Role không hợp lệ: " + role);
+        }
+
+        // Safety Guard 1: Không cho phép Admin tự hạ quyền của chính mình
+        if (principal != null && u.getUsername().equalsIgnoreCase(principal.getName()) && newRole != Role.ADMIN) {
+            throw new BadRequestException("Bạn không thể tự hạ quyền Quản trị viên của chính mình");
+        }
+
+        // Safety Guard 2: Không cho phép hạ quyền nếu chỉ còn 1 Admin duy nhất trong toàn hệ thống
+        if (u.getRole() == Role.ADMIN && newRole != Role.ADMIN && userRepository.countByRole(Role.ADMIN) <= 1) {
+            throw new BadRequestException("Không thể hạ quyền Quản trị viên duy nhất trong hệ thống");
+        }
+
+        u.setRole(newRole);
+        userRepository.save(u);
+
+        String message = newRole == Role.ADMIN
+                ? "Đã nâng quyền Quản trị viên (ADMIN) cho @" + u.getUsername()
+                : "Đã chuyển vai trò về Thành viên (USER) cho @" + u.getUsername();
+
+        return ResponseEntity.ok(ApiResponse.success(null, message));
+    }
+
+    /**
+     * Xóa tài khoản người dùng
+     */
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(
+            @PathVariable Long id,
+            java.security.Principal principal) {
+
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng ID: " + id));
+
+        // Safety Guard 1: Không cho phép Admin tự xóa chính tài khoản đang đăng nhập
+        if (principal != null && u.getUsername().equalsIgnoreCase(principal.getName())) {
+            throw new BadRequestException("Bạn không thể tự xóa tài khoản của chính mình");
+        }
+
+        // Safety Guard 2: Không xóa Admin cuối cùng
+        if (u.getRole() == Role.ADMIN && userRepository.countByRole(Role.ADMIN) <= 1) {
+            throw new BadRequestException("Không thể xóa tài khoản Quản trị viên duy nhất trong hệ thống");
+        }
+
+        userRepository.deleteById(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa người dùng @" + u.getUsername()));
+    }
+
+    // ==================== AI LOGS MONITORING ====================
+
+    /**
+     * Danh sách nhật ký gợi ý của Trợ lý AI Gemini (phân trang, lọc theo type, kèm thống kê)
+     */
+    @GetMapping("/ai-logs")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAdminAiLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String type) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        AiSuggestionType typeEnum = null;
+        if (type != null && !type.isBlank() && !type.equalsIgnoreCase("ALL")) {
+            try {
+                typeEnum = AiSuggestionType.valueOf(type.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        Page<AiSuggestionLog> logPage = typeEnum != null
+                ? aiSuggestionLogRepository.findByTypeOrderByCreatedAtDesc(typeEnum, pageable)
+                : aiSuggestionLogRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        List<Map<String, Object>> items = logPage.getContent().stream().map(log -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", log.getId());
+            item.put("userId", log.getUser() != null ? log.getUser().getId() : null);
+            item.put("username", log.getUser() != null ? log.getUser().getUsername() : "—");
+            item.put("displayName", log.getUser() != null ? log.getUser().getDisplayName() : "—");
+            item.put("avatarUrl", log.getUser() != null ? log.getUser().getAvatarUrl() : null);
+            item.put("type", log.getType() != null ? log.getType().name() : "ZERO_WASTE");
+            item.put("inputIngredients", log.getInputIngredients());
+
+            // Tóm tắt tiêu đề món và thời gian từ JSON response
+            String recipeTitle = "Gợi ý món ăn";
+            int prepTime = 0;
+            int cookTime = 0;
+            String difficulty = "EASY";
+            try {
+                if (log.getOutputResponse() != null) {
+                    var tree = objectMapper.readTree(log.getOutputResponse());
+                    recipeTitle = tree.path("title").asText("Gợi ý món ăn");
+                    prepTime = tree.path("prepTime").asInt(0);
+                    cookTime = tree.path("cookTime").asInt(0);
+                    difficulty = tree.path("difficulty").asText("EASY");
+                }
+            } catch (Exception ignored) {
+            }
+
+            item.put("recipeTitle", recipeTitle);
+            item.put("prepTime", prepTime);
+            item.put("cookTime", cookTime);
+            item.put("difficulty", difficulty);
+            item.put("outputResponse", log.getOutputResponse());
+            item.put("savedRecipeId", log.getSavedRecipe() != null ? log.getSavedRecipe().getId() : null);
+            item.put("savedRecipeTitle", log.getSavedRecipe() != null ? log.getSavedRecipe().getTitle() : null);
+            item.put("createdAt", log.getCreatedAt());
+            return item;
+        }).toList();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("content", items);
+        response.put("totalElements", logPage.getTotalElements());
+        response.put("totalPages", logPage.getTotalPages());
+        response.put("currentPage", page);
+
+        // KPI Thống kê thực tế phục vụ Admin Dashboard / Settings
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        long totalCalls = aiSuggestionLogRepository.count();
+        long todayCalls = aiSuggestionLogRepository.countTodayCalls(startOfToday);
+        long savedRecipes = aiSuggestionLogRepository.countSavedRecipes();
+
+        response.put("totalCalls", totalCalls);
+        response.put("todayCalls", todayCalls);
+        response.put("savedRecipes", savedRecipes);
+
+        return ResponseEntity.ok(ApiResponse.success(response, "Lấy danh sách nhật ký AI thành công"));
     }
 }
