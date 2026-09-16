@@ -17,6 +17,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     Page<Recipe> findByAuthorAndStatusNot(User author, RecipeStatus status, Pageable pageable);
 
+    Page<Recipe> findByAuthorAndStatus(User author, RecipeStatus status, Pageable pageable);
+
     Page<Recipe> findByStatus(RecipeStatus status, Pageable pageable);
 
     long countByAuthorIdAndStatus(Long authorId, RecipeStatus status);
@@ -29,6 +31,9 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     long countByStatusNot(RecipeStatus status);
 
     List<Recipe> findByClonedFromId(Long clonedFromId);
+
+    @Query("SELECT COUNT(r) FROM Recipe r WHERE r.clonedFrom.id = :recipeId")
+    int countByClonedFromId(@Param("recipeId") Long recipeId);
 
     @Query(value = "SELECT DISTINCT r FROM Recipe r " +
            "LEFT JOIN r.tags rt " +
@@ -55,6 +60,14 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     // Admin recipe moderation
     Page<Recipe> findByStatusOrderByCreatedAtDesc(RecipeStatus status, Pageable pageable);
 
+    @Query("SELECT r FROM Recipe r WHERE r.status = :status AND (:keyword IS NULL OR LOWER(r.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(r.author.displayName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(r.author.username) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY r.createdAt DESC")
+    Page<Recipe> findByStatusAndKeywordOrderByCreatedAtDesc(@Param("status") RecipeStatus status, @Param("keyword") String keyword, Pageable pageable);
+
     @Query("SELECT r FROM Recipe r WHERE r.status IN (:statuses) ORDER BY r.createdAt DESC")
     Page<Recipe> findByStatusIn(@Param("statuses") List<RecipeStatus> statuses, Pageable pageable);
+
+    @Query("SELECT r.difficulty, COUNT(r) FROM Recipe r WHERE r.status = com.smartrecipe.smartrecipe_backend.enums.RecipeStatus.PUBLIC AND r.difficulty IS NOT NULL GROUP BY r.difficulty")
+    List<Object[]> countGroupByDifficulty();
+
+    List<Recipe> findTop3ByStatusOrderByCreatedAtDesc(RecipeStatus status);
 }

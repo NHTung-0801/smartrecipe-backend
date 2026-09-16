@@ -46,4 +46,8 @@ public interface PantryRepository extends JpaRepository<UserPantry, Long> {
     @Query("SELECT COUNT(p) FROM UserPantry p WHERE p.user.id = :userId " +
            "AND p.lowStockThreshold IS NOT NULL AND p.quantityAvailable <= p.lowStockThreshold")
     long countLowStockByUserId(@Param("userId") Long userId);
+
+    /** Đếm số nguyên liệu sắp hết hạn hoặc đã hết hạn trên toàn hệ thống trước hoặc trong ngày targetDate. */
+    @Query("SELECT COUNT(p) FROM UserPantry p WHERE p.expiryDate IS NOT NULL AND p.expiryDate <= :targetDate")
+    long countExpiringSoon(@Param("targetDate") LocalDate targetDate);
 }

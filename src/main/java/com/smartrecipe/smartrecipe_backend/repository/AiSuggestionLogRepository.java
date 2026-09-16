@@ -23,4 +23,13 @@ public interface AiSuggestionLogRepository extends JpaRepository<AiSuggestionLog
      * Lấy danh sách log gợi ý AI của một user, sắp xếp theo thời gian mới nhất.
      */
     List<AiSuggestionLog> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    @Query("SELECT COUNT(a) FROM AiSuggestionLog a WHERE a.savedRecipe IS NOT NULL")
+    long countSavedRecipes();
+
+    @Query("SELECT a.type, COUNT(a) FROM AiSuggestionLog a GROUP BY a.type")
+    List<Object[]> countGroupByType();
+
+    @Query("SELECT COUNT(a) FROM AiSuggestionLog a WHERE a.createdAt >= :startOfDay")
+    long countTodayCalls(@Param("startOfDay") LocalDateTime startOfDay);
 }

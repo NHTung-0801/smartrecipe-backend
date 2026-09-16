@@ -17,10 +17,14 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
     List<Ingredient> findByNameContainingIgnoreCase(String name);
 
     Page<Ingredient> findByNameContainingIgnoreCase(String name, Pageable pageable);
-    
+
     Optional<Ingredient> findFirstByNameIgnoreCase(String name);
 
     List<Ingredient> findByAisleId(Integer aisleId);
+
+    Page<Ingredient> findByAisleId(Integer aisleId, Pageable pageable);
+
+    Page<Ingredient> findByNameContainingIgnoreCaseAndAisleId(String name, Integer aisleId, Pageable pageable);
 
     // Admin: nguyên liệu chờ duyệt (calories=0, loại trừ gia vị như muối)
     @Query("SELECT i FROM Ingredient i WHERE i.caloriesPer100g = 0 " +

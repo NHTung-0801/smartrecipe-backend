@@ -32,4 +32,8 @@ public interface CookingJournalRepository extends JpaRepository<CookingJournal, 
     /** Lấy đánh giá trung bình của user cho một công thức (chỉ tính rating > 0). */
     @org.springframework.data.jpa.repository.Query("SELECT AVG(c.rating) FROM CookingJournal c WHERE c.user.id = :userId AND c.recipe.id = :recipeId AND c.rating > 0")
     Double getAverageRatingByUserIdAndRecipeId(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("recipeId") Long recipeId);
+
+    /** Lấy đánh giá trung bình toàn hệ thống (chỉ tính rating > 0). */
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(c.rating) FROM CookingJournal c WHERE c.rating > 0")
+    Double getPlatformAverageRating();
 }
