@@ -36,20 +36,34 @@ jobs:
 
       - name: Run unit tests (Mockito only — exclude SpringBootTest)
         run: |
-          ./mvnw -B test -Dspring.profiles.active=test
+          ./mvnw -B test -Dspring.profiles.active=test > build-log.txt 2>&1 || {
+            status=$?
+            echo "### ❌ Maven Test Failed (exit code $status)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 80 build-log.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat build-log.txt
+            exit $status
+          }
         env:
           SPRING_DATASOURCE_URL: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
           SPRING_DATASOURCE_USERNAME: sa
           SPRING_DATASOURCE_PASSWORD: ""
+          SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.H2Dialect
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
           JWT_SECRET: ci-test-secret-key-not-for-production
           GEMINI_API_KEY: ci-fake-key
+          CLOUDINARY_URL: cloudinary://123456789:abcdefg@testcloud
 
-      - name: Upload Surefire Reports on failure
+      - name: Upload Test Logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: surefire-reports
-          path: target/surefire-reports/
+          name: backend-test-logs
+          path: |
+            build-log.txt
+            target/surefire-reports/
 
       - name: Build JAR (skip tests)
         run: ./mvnw -B package -DskipTests
