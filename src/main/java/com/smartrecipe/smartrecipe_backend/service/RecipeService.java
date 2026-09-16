@@ -27,6 +27,7 @@ public interface RecipeService {
 
     // My Recipes (Draft & Public, exclude DELETED)
     Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size);
+    Page<RecipeSummaryResponse> getMyRecipes(Long userId, String status, int page, int size);
 
     // Public Recipes (Explore)
     Page<RecipeSummaryResponse> getPublicRecipes(int page, int size, String sortBy);

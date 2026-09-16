@@ -27,6 +27,7 @@ public class RecipeResponse {
     private Integer likeCount;
     private Integer cookCount;
     private Long clonedFromId;
+    private Integer cloneCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

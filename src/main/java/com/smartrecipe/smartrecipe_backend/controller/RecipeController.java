@@ -102,10 +102,11 @@ public class RecipeController {
     @GetMapping("/my")
     public ResponseEntity<Page<RecipeSummaryResponse>> getMyRecipes(
             Principal principal,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Long userId = getUserId(principal);
-        Page<RecipeSummaryResponse> response = recipeService.getMyRecipes(userId, page, size);
+        Page<RecipeSummaryResponse> response = recipeService.getMyRecipes(userId, status, page, size);
         return ResponseEntity.ok(response);
     }
 

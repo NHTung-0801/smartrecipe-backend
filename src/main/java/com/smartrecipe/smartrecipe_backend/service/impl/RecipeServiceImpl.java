@@ -268,7 +268,13 @@ public class RecipeServiceImpl implements RecipeService {
             throw new RuntimeException("Bạn không có quyền thay đổi trạng thái công thức này");
         }
 
-        recipe.setStatus(status);
+        // Nếu user muốn đăng PUBLIC → chuyển sang PENDING_REVIEW để Admin kiểm duyệt
+        // Chỉ Admin (qua AdminController) mới được set trực tiếp PUBLIC
+        RecipeStatus finalStatus = (status == RecipeStatus.PUBLIC)
+                ? RecipeStatus.PENDING_REVIEW
+                : status;
+
+        recipe.setStatus(finalStatus);
         recipe = recipeRepository.save(recipe);
         return mapToDetailResponse(recipe);
     }
@@ -278,11 +284,25 @@ public class RecipeServiceImpl implements RecipeService {
     @Override
     @Transactional(readOnly = true)
     public Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size) {
+        return getMyRecipes(userId, null, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<RecipeSummaryResponse> getMyRecipes(Long userId, String status, int page, int size) {
         User author = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        return recipeRepository.findByAuthorAndStatusNot(author, RecipeStatus.DELETED, pageable)
-                .map(this::mapToSummaryResponse);
+
+        Page<Recipe> pageResult;
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            RecipeStatus recipeStatus = RecipeStatus.valueOf(status.trim().toUpperCase());
+            pageResult = recipeRepository.findByAuthorAndStatus(author, recipeStatus, pageable);
+        } else {
+            pageResult = recipeRepository.findByAuthorAndStatusNot(author, RecipeStatus.DELETED, pageable);
+        }
+
+        return pageResult.map(this::mapToSummaryResponse);
     }
 
     @Override
@@ -510,6 +530,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         NutritionSummaryResponse nutrition = calculateNutrition(recipe);
         Integer cookCount = cookingJournalRepository.countByRecipeId(recipe.getId());
+        Integer cloneCount = recipeRepository.countByClonedFromId(recipe.getId());
 
         return RecipeResponse.builder()
                 .id(recipe.getId())
@@ -523,6 +544,7 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(recipe.getDifficulty())
                 .likeCount(recipe.getLikeCount())
                 .clonedFromId(recipe.getClonedFrom() != null ? recipe.getClonedFrom().getId() : null)
+                .cloneCount(cloneCount)
                 .cookCount(cookCount)
                 .createdAt(recipe.getCreatedAt())
                 .updatedAt(recipe.getUpdatedAt())
@@ -544,6 +566,7 @@ public class RecipeServiceImpl implements RecipeService {
 
         NutritionSummaryResponse nutrition = calculateNutrition(recipe);
         Integer cookCount = cookingJournalRepository.countByRecipeId(recipe.getId());
+        Integer cloneCount = recipeRepository.countByClonedFromId(recipe.getId());
 
         return RecipeSummaryResponse.builder()
                 .id(recipe.getId())
@@ -557,12 +580,14 @@ public class RecipeServiceImpl implements RecipeService {
                 .difficulty(recipe.getDifficulty())
                 .likeCount(recipe.getLikeCount())
                 .clonedFromId(recipe.getClonedFrom() != null ? recipe.getClonedFrom().getId() : null)
+                .cloneCount(cloneCount)
                 .cookCount(cookCount)
                 .createdAt(recipe.getCreatedAt())
                 .updatedAt(recipe.getUpdatedAt())
                 .author(mapAuthor(recipe.getAuthor()))
                 .tags(tagResponses)
                 .nutrition(nutrition)
+                .ingredientCount(recipe.getIngredients() != null ? recipe.getIngredients().size() : 0)
                 .build();
     }
 

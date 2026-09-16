@@ -27,10 +27,12 @@ public class RecipeSummaryResponse {
     private Integer likeCount;
     private Integer cookCount;
     private Long clonedFromId;
+    private Integer cloneCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     private AuthorSummaryResponse author;
     private List<TagResponse> tags;
     private NutritionSummaryResponse nutrition;
+    private Integer ingredientCount;
 }
