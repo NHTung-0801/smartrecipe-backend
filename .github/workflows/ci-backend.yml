@@ -31,6 +31,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
       - name: Run unit tests (Mockito only — exclude SpringBootTest)
         run: |
           ./mvnw -B test \
