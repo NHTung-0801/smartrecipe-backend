@@ -386,7 +386,8 @@ public class AdminController {
 
         String name = body.get("name") != null ? body.get("name").toString().trim() : null;
         if (name == null || name.isBlank()) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Tên nguyên liệu không được để trống"));
+            return ResponseEntity.badRequest().body(ApiResponse.error("Tên nguyên liệu không được để trống", "VALIDATION_ERROR"));
+
         }
 
         String baseUnit = body.get("baseUnit") != null && !body.get("baseUnit").toString().isBlank()
