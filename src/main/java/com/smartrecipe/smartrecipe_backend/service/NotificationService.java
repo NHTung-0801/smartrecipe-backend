@@ -14,4 +14,6 @@ public interface NotificationService {
     void markAsRead(Long notificationId, Long userId);
     void markAllAsRead(Long userId);
     void createNotification(User recipient, User actor, Recipe recipe, RecipeComment comment, NotificationType type, String message);
+    /** Như createNotification nhưng bỏ qua nếu actor == recipient (tránh self-notification) */
+    void createNotificationSafe(User recipient, User actor, Recipe recipe, RecipeComment comment, NotificationType type, String message);
 }

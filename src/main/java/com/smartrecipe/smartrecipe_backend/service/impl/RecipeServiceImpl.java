@@ -13,7 +13,9 @@ import com.smartrecipe.smartrecipe_backend.exception.UnauthorizedException;
 import com.smartrecipe.smartrecipe_backend.repository.*;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.repository.CookingJournalRepository;
+import com.smartrecipe.smartrecipe_backend.enums.NotificationType;
 import com.smartrecipe.smartrecipe_backend.service.CloudinaryService;
+import com.smartrecipe.smartrecipe_backend.service.NotificationService;
 import com.smartrecipe.smartrecipe_backend.service.PantryService;
 import com.smartrecipe.smartrecipe_backend.service.RecipeService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,6 +53,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final CookingJournalRepository cookingJournalRepository;
     private final com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
     private final PantryService pantryService;
+    private final NotificationService notificationService;
 
     // ==================== CRUD ====================
 
@@ -300,8 +304,15 @@ public class RecipeServiceImpl implements RecipeService {
 
         Page<Recipe> pageResult;
         if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
-            RecipeStatus recipeStatus = RecipeStatus.valueOf(status.trim().toUpperCase());
-            pageResult = recipeRepository.findByAuthorAndStatus(author, recipeStatus, pageable);
+            String normalizedStatus = status.trim().toUpperCase();
+            // Tab "Riêng tư / Nháp" (PRIVATE) bao gồm cả PRIVATE lẫn DRAFT
+            if ("PRIVATE".equals(normalizedStatus)) {
+                List<RecipeStatus> privateAndDraft = Arrays.asList(RecipeStatus.PRIVATE, RecipeStatus.DRAFT);
+                pageResult = recipeRepository.findByAuthorAndStatusIn(author, privateAndDraft, pageable);
+            } else {
+                RecipeStatus recipeStatus = RecipeStatus.valueOf(normalizedStatus);
+                pageResult = recipeRepository.findByAuthorAndStatus(author, recipeStatus, pageable);
+            }
         } else {
             pageResult = recipeRepository.findByAuthorAndStatusNot(author, RecipeStatus.DELETED, pageable);
         }
@@ -422,7 +433,9 @@ public class RecipeServiceImpl implements RecipeService {
         List<RecipeStep> clonedSteps = original.getSteps().stream()
                 .map(s -> RecipeStep.builder()
                         .stepNumber(s.getStepNumber())
+                        .title(s.getTitle())
                         .instruction(s.getInstruction())
+                        .imageUrl(s.getImageUrl())
                         .recipe(cloned)
                         .build())
                 .collect(Collectors.toList());
@@ -449,6 +462,22 @@ public class RecipeServiceImpl implements RecipeService {
         cloned.setTags(clonedTags);
 
         Recipe saved = recipeRepository.save(cloned);
+
+        // Gửi thông báo cho tác giả công thức gốc nếu người clone không phải chính tác giả
+        if (original.getAuthor() != null && !original.getAuthor().getId().equals(cloner.getId())) {
+            String clonerName = cloner.getDisplayName() != null && !cloner.getDisplayName().trim().isEmpty()
+                    ? cloner.getDisplayName()
+                    : cloner.getUsername();
+            notificationService.createNotificationSafe(
+                    original.getAuthor(),
+                    cloner,
+                    original,
+                    null,
+                    NotificationType.RECIPE_CLONE,
+                    clonerName + " đã sao chép công thức \"" + original.getTitle() + "\" của bạn"
+            );
+        }
+
         return mapToDetailResponse(saved);
     }
 
@@ -469,6 +498,17 @@ public class RecipeServiceImpl implements RecipeService {
             recipeLikeRepository.save(like);
             recipe.setLikeCount(recipe.getLikeCount() + 1);
             recipeRepository.save(recipe);
+
+            // Thông báo cho tác giả khi có người thích công thức của họ
+            String likerName = user.getDisplayName() != null ? user.getDisplayName() : user.getUsername();
+            notificationService.createNotificationSafe(
+                    recipe.getAuthor(),
+                    user,
+                    recipe,
+                    null,
+                    NotificationType.RECIPE_LIKE,
+                    likerName + " đã thích công thức \"" + recipe.getTitle() + "\" của bạn"
+            );
         }
     }
 

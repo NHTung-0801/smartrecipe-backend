@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -18,6 +19,8 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     Page<Recipe> findByAuthorAndStatusNot(User author, RecipeStatus status, Pageable pageable);
 
     Page<Recipe> findByAuthorAndStatus(User author, RecipeStatus status, Pageable pageable);
+
+    Page<Recipe> findByAuthorAndStatusIn(User author, Collection<RecipeStatus> statuses, Pageable pageable);
 
     Page<Recipe> findByStatus(RecipeStatus status, Pageable pageable);
 
@@ -70,4 +73,7 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
     List<Object[]> countGroupByDifficulty();
 
     List<Recipe> findTop3ByStatusOrderByCreatedAtDesc(RecipeStatus status);
+
+    @Query("SELECT COALESCE(SUM(r.likeCount), 0) FROM Recipe r WHERE r.author.id = :authorId AND r.status = com.smartrecipe.smartrecipe_backend.enums.RecipeStatus.PUBLIC")
+    long sumLikeCountByAuthorId(@Param("authorId") Long authorId);
 }

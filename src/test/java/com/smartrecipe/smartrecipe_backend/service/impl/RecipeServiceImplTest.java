@@ -44,6 +44,7 @@ class RecipeServiceImplTest {
     @Mock CookingJournalRepository cookingJournalRepository;
     @Mock com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
     @Mock PantryService pantryService;
+    @Mock com.smartrecipe.smartrecipe_backend.service.NotificationService notificationService;
 
     private RecipeServiceImpl service;
     private User owner;
@@ -64,7 +65,8 @@ class RecipeServiceImplTest {
                 cloudinaryService,
                 cookingJournalRepository,
                 unitNormalizationService,
-                pantryService);
+                pantryService,
+                notificationService);
         owner = User.builder().id(1L).username("owner").build();
         otherUser = User.builder().id(2L).username("other").build();
     }
@@ -98,7 +100,9 @@ class RecipeServiceImplTest {
         original.setSteps(new ArrayList<>(List.of(RecipeStep.builder()
                 .id(100L)
                 .stepNumber(1)
-                .instruction("Nấu")
+                .title("Sơ chế cá")
+                .instruction("Nấu canh chua")
+                .imageUrl("https://example.com/step1.jpg")
                 .recipe(original)
                 .build())));
         when(recipeRepository.findById(10L)).thenReturn(Optional.of(original));
@@ -118,8 +122,35 @@ class RecipeServiceImplTest {
         assertThat(cloned.getAuthor()).isSameAs(otherUser);
         assertThat(cloned.getClonedFrom()).isSameAs(original);
         assertThat(cloned.getSteps()).hasSize(1);
-        assertThat(cloned.getSteps().getFirst()).isNotSameAs(original.getSteps().getFirst());
+        RecipeStep clonedStep = cloned.getSteps().getFirst();
+        assertThat(clonedStep).isNotSameAs(original.getSteps().getFirst());
+        assertThat(clonedStep.getTitle()).isEqualTo("Sơ chế cá");
+        assertThat(clonedStep.getImageUrl()).isEqualTo("https://example.com/step1.jpg");
+        assertThat(clonedStep.getInstruction()).isEqualTo("Nấu canh chua");
         assertThat(response.getClonedFromId()).isEqualTo(10L);
+
+        // Verify notification sent to original author
+        verify(notificationService).createNotificationSafe(
+                eq(owner),
+                eq(otherUser),
+                eq(original),
+                isNull(),
+                eq(com.smartrecipe.smartrecipe_backend.enums.NotificationType.RECIPE_CLONE),
+                contains("Canh chua")
+        );
+    }
+
+    @Test
+    void cloneRecipe_whenSelfClone_doesNotSendNotification() {
+        Recipe original = recipe(10L, owner, RecipeStatus.PUBLIC);
+        original.setTitle("Canh chua");
+        when(recipeRepository.findById(10L)).thenReturn(Optional.of(original));
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+        when(recipeRepository.save(any(Recipe.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.cloneRecipe(10L, owner.getId());
+
+        verify(notificationService, never()).createNotificationSafe(any(), any(), any(), any(), any(), any());
     }
 
     @Test

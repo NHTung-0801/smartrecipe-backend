@@ -78,6 +78,12 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository.save(notification);
     }
 
+    @Override
+    public void createNotificationSafe(User recipient, User actor, Recipe recipe, RecipeComment comment, NotificationType type, String message) {
+        // Delegate — self-notification guard is already in createNotification
+        createNotification(recipient, actor, recipe, comment, type, message);
+    }
+
     private NotificationResponse mapToResponse(Notification n) {
         AuthorSummaryResponse actorResponse = null;
         if (n.getActor() != null) {
