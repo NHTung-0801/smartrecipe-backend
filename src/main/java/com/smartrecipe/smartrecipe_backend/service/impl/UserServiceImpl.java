@@ -41,6 +41,7 @@ public class UserServiceImpl implements UserService {
         
         // Đếm số công thức PUBLIC đã đóng góp cho cộng đồng (áp dụng cho cả trang cá nhân và trang công khai)
         recipeCount = recipeRepository.countByAuthorIdAndStatus(user.getId(), RecipeStatus.PUBLIC);
+        long totalLikes = recipeRepository.sumLikeCountByAuthorId(user.getId());
         
         if (currentUsername != null && !currentUsername.equals(user.getUsername())) {
             // Kiểm tra xem currentUsername đã follow user này chưa (khi xem profile người khác)
@@ -61,6 +62,7 @@ public class UserServiceImpl implements UserService {
                 .recipeCount((int) recipeCount)
                 .followerCount(followerCount)
                 .followingCount(followingCount)
+                .totalLikes(totalLikes)
                 .isFollowing(isFollowing)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())

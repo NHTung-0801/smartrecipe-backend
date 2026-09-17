@@ -67,6 +67,10 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/recipes/{id:\\d+}/export/word").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/{id:\\d+}/profile").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*/profile").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/{id:\\d+}/followers").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/followers").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/{id:\\d+}/following").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/users/*/following").permitAll()
                     .requestMatchers("/actuator/health").permitAll() // CI/CD health check
                     .requestMatchers("/error").permitAll()
                     .anyRequest().authenticated()

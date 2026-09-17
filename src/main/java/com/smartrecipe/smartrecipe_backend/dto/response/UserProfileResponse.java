@@ -20,6 +20,7 @@ public class UserProfileResponse {
     private Integer recipeCount;
     private Long followerCount;
     private Long followingCount;
+    private Long totalLikes;
     private Boolean isFollowing; // Dành cho Public Profile (đang xem có follow người này chưa)
     
     private LocalDateTime createdAt;

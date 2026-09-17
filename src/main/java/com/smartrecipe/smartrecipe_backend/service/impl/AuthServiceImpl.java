@@ -62,13 +62,14 @@ public class AuthServiceImpl implements AuthService {
         // Set context cho phiên hiện tại
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // Sinh Access Token & Refresh Token
-        String jwt = jwtProvider.generateToken(authentication);
-        String refreshToken = jwtProvider.generateRefreshToken(loginRequest.getUsername());
-        
         // Lấy thông tin user (đã được xác thực nên chắc chắn tồn tại)
         User user = userRepository.findByUsername(loginRequest.getUsername())
+                .or(() -> userRepository.findByEmail(loginRequest.getUsername()))
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy User"));
+
+        // Sinh Access Token & Refresh Token
+        String jwt = jwtProvider.generateToken(authentication);
+        String refreshToken = jwtProvider.generateRefreshToken(user.getUsername());
 
         return AuthResponse.builder()
                 .accessToken(jwt)

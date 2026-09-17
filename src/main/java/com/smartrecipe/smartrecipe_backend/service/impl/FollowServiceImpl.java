@@ -8,6 +8,8 @@ import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.FollowRepository;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.service.FollowService;
+import com.smartrecipe.smartrecipe_backend.service.NotificationService;
+import com.smartrecipe.smartrecipe_backend.enums.NotificationType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +25,7 @@ public class FollowServiceImpl implements FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     private User getUserByUsername(String username) {
         return userRepository.findByUsername(username)
@@ -53,6 +56,17 @@ public class FollowServiceImpl implements FollowService {
                 .build();
         
         followRepository.save(follow);
+
+        // Thông báo cho người dùng mới được theo dõi
+        String followerName = follower.getDisplayName() != null ? follower.getDisplayName() : follower.getUsername();
+        notificationService.createNotificationSafe(
+                following,
+                follower,
+                null,
+                null,
+                NotificationType.NEW_FOLLOWER,
+                followerName + " đã bắt đầu theo dõi bạn"
+        );
     }
 
     @Override
