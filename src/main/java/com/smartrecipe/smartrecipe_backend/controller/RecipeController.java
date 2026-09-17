@@ -2,7 +2,9 @@ package com.smartrecipe.smartrecipe_backend.controller;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.RecipeRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RecipeSearchRequest;
+import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.ImageUploadResponse;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeSummaryResponse;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
@@ -154,12 +156,13 @@ public class RecipeController {
     // ==================== COOKING JOURNAL ====================
 
     @PostMapping("/{id}/cook")
-    public ResponseEntity<Void> recordCookSession(
+    public ResponseEntity<ApiResponse<JournalResponse>> recordCookSession(
             @PathVariable Long id,
+            @RequestParam(required = false) Integer servings,
             Principal principal) {
         Long userId = getUserId(principal);
-        recipeService.recordCookSession(id, userId);
-        return ResponseEntity.ok().build();
+        JournalResponse journal = recipeService.recordCookSession(id, userId, servings);
+        return ResponseEntity.ok(ApiResponse.success(journal, "Đã ghi nhận nấu ăn và cập nhật kho thành công!"));
     }
 
     // ==================== LIKE / UNLIKE ====================

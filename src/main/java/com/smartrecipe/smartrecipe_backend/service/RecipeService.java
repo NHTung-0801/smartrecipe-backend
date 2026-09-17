@@ -3,6 +3,7 @@ package com.smartrecipe.smartrecipe_backend.service;
 import com.smartrecipe.smartrecipe_backend.dto.request.RecipeRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RecipeSearchRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.ImageUploadResponse;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeSummaryResponse;
 import org.springframework.data.domain.Page;
@@ -23,7 +24,15 @@ public interface RecipeService {
 
     RecipeResponse changeStatus(Long id, com.smartrecipe.smartrecipe_backend.enums.RecipeStatus status, Long userId);
 
-    void recordCookSession(Long id, Long userId);
+    /**
+     * Ghi nhận buổi nấu ăn và tự động trừ kho theo FEFO.
+     *
+     * @param id       ID công thức
+     * @param userId   ID người dùng
+     * @param servings Số khẩu phần thực tế nấu (null = dùng baseServings của công thức)
+     * @return JournalResponse chứa deductionSummary (danh sách nguyên liệu đã trừ)
+     */
+    JournalResponse recordCookSession(Long id, Long userId, Integer servings);
 
     // My Recipes (Draft & Public, exclude DELETED)
     Page<RecipeSummaryResponse> getMyRecipes(Long userId, int page, int size);

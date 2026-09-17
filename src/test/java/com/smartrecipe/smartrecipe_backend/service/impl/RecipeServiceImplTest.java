@@ -1,6 +1,7 @@
 package com.smartrecipe.smartrecipe_backend.service.impl;
 
 import com.smartrecipe.smartrecipe_backend.dto.request.RecipeRequest;
+import com.smartrecipe.smartrecipe_backend.dto.response.JournalResponse;
 import com.smartrecipe.smartrecipe_backend.dto.response.RecipeResponse;
 import com.smartrecipe.smartrecipe_backend.entity.Recipe;
 import com.smartrecipe.smartrecipe_backend.entity.RecipeLike;
@@ -10,6 +11,7 @@ import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
 import com.smartrecipe.smartrecipe_backend.exception.UnauthorizedException;
 import com.smartrecipe.smartrecipe_backend.repository.*;
 import com.smartrecipe.smartrecipe_backend.service.CloudinaryService;
+import com.smartrecipe.smartrecipe_backend.service.PantryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +43,7 @@ class RecipeServiceImplTest {
     @Mock CloudinaryService cloudinaryService;
     @Mock CookingJournalRepository cookingJournalRepository;
     @Mock com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
+    @Mock PantryService pantryService;
 
     private RecipeServiceImpl service;
     private User owner;
@@ -60,7 +63,8 @@ class RecipeServiceImplTest {
                 tagRepository,
                 cloudinaryService,
                 cookingJournalRepository,
-                unitNormalizationService);
+                unitNormalizationService,
+                pantryService);
         owner = User.builder().id(1L).username("owner").build();
         otherUser = User.builder().id(2L).username("other").build();
     }
@@ -133,6 +137,31 @@ class RecipeServiceImplTest {
         assertThat(recipe.getLikeCount()).isEqualTo(4);
         verify(recipeLikeRepository, times(1)).save(any(RecipeLike.class));
         verify(recipeRepository, times(1)).save(recipe);
+    }
+
+    @Test
+    void recordCookSession_deductsIngredients_andPersistsJournal() {
+        Recipe recipe = recipe(10L, owner, RecipeStatus.PUBLIC);
+        when(recipeRepository.findById(10L)).thenReturn(Optional.of(recipe));
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+
+        JournalResponse.DeductionDetail detail = JournalResponse.DeductionDetail.builder()
+                .ingredientName("Trứng gà").deductedAmount(3.0).unit("quả").build();
+        when(pantryService.deductIngredientsForRecipe(owner.getId(), 10L, 2))
+                .thenReturn(List.of(detail));
+
+        // simulate save returning the same journal with an ID
+        com.smartrecipe.smartrecipe_backend.entity.CookingJournal fakeJournal =
+                com.smartrecipe.smartrecipe_backend.entity.CookingJournal.builder()
+                        .id(99L).recipe(recipe).user(owner).actualServings(2).build();
+        when(cookingJournalRepository.save(any())).thenReturn(fakeJournal);
+
+        JournalResponse response = service.recordCookSession(10L, owner.getId(), null);
+
+        verify(pantryService).deductIngredientsForRecipe(owner.getId(), 10L, 2);
+        verify(cookingJournalRepository).save(any());
+        assertThat(response.getDeductionSummary()).hasSize(1);
+        assertThat(response.getDeductionSummary().get(0).getIngredientName()).isEqualTo("Trứng gà");
     }
 
     @Test

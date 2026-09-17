@@ -14,8 +14,10 @@ import com.smartrecipe.smartrecipe_backend.repository.*;
 import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
 import com.smartrecipe.smartrecipe_backend.repository.CookingJournalRepository;
 import com.smartrecipe.smartrecipe_backend.service.CloudinaryService;
+import com.smartrecipe.smartrecipe_backend.service.PantryService;
 import com.smartrecipe.smartrecipe_backend.service.RecipeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -46,6 +49,7 @@ public class RecipeServiceImpl implements RecipeService {
     private final CloudinaryService cloudinaryService;
     private final CookingJournalRepository cookingJournalRepository;
     private final com.smartrecipe.smartrecipe_backend.service.UnitNormalizationService unitNormalizationService;
+    private final PantryService pantryService;
 
     // ==================== CRUD ====================
 
@@ -342,19 +346,54 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional
-    public void recordCookSession(Long id, Long userId) {
+    public JournalResponse recordCookSession(Long id, Long userId, Integer servings) {
         Recipe recipe = recipeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công thức với ID: " + id));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
-        com.smartrecipe.smartrecipe_backend.entity.CookingJournal journal = com.smartrecipe.smartrecipe_backend.entity.CookingJournal.builder()
+        // Xác định số khẩu phần thực tế
+        int actualServings = (servings != null && servings > 0) ? servings : recipe.getBaseServings();
+
+        // Bước 1 — Tự động trừ kho nguyên liệu theo thuật toán FEFO
+        List<JournalResponse.DeductionDetail> deductions;
+        try {
+            deductions = pantryService.deductIngredientsForRecipe(userId, recipe.getId(), actualServings);
+            log.info("[recordCookSession] Đã trừ {} nguyên liệu khỏi tủ cho user={}, recipe={}",
+                    deductions.size(), userId, id);
+        } catch (Exception e) {
+            // Nếu việc trừ kho thất bại, ghi log nhưng không chặn việc lưu nhật ký
+            log.warn("[recordCookSession] Trừ kho thất bại cho user={}, recipe={}: {}", userId, id, e.getMessage());
+            deductions = java.util.List.of();
+        }
+
+        // Bước 2 — Lưu nhật ký nấu ăn
+        CookingJournal journal = CookingJournal.builder()
                 .recipe(recipe)
                 .user(user)
-                .actualServings(recipe.getBaseServings())
-                .rating(null) // Rating will be implemented later
+                .actualServings(actualServings)
+                .rating(null) // Rating sẽ được cập nhật sau qua nhật ký
                 .build();
-        cookingJournalRepository.save(journal);
+        CookingJournal saved = cookingJournalRepository.save(journal);
+
+        // Bước 3 — Đóng gói kết quả trả về
+        JournalResponse.RecipeSummaryInfo recipeInfo = JournalResponse.RecipeSummaryInfo.builder()
+                .id(recipe.getId())
+                .title(recipe.getTitle())
+                .imageUrl(recipe.getImageUrl())
+                .baseServings(recipe.getBaseServings())
+                .build();
+
+        JournalResponse response = JournalResponse.builder()
+                .id(saved.getId())
+                .recipe(recipeInfo)
+                .cookedAt(saved.getCookedAt())
+                .actualServings(saved.getActualServings())
+                .rating(null)
+                .deductionSummary(deductions)
+                .build();
+
+        return response;
     }
 
     @Override
