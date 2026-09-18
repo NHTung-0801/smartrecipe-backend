@@ -1,9 +1,12 @@
 package com.smartrecipe.smartrecipe_backend.controller;
 
+import com.smartrecipe.smartrecipe_backend.dto.request.ForgotPasswordRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.LoginRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RefreshTokenRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.RegisterRequest;
+import com.smartrecipe.smartrecipe_backend.dto.request.ResetPasswordRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.ApiResponse;
+
 import com.smartrecipe.smartrecipe_backend.dto.response.AuthResponse;
 import com.smartrecipe.smartrecipe_backend.service.AuthService;
 import jakarta.validation.Valid;
@@ -46,4 +49,17 @@ public class AuthController {
         authService.logout(username);
         return ResponseEntity.ok(ApiResponse.success(null, "Đăng xuất thành công!"));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mã xác thực OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư!"));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập với mật khẩu mới!"));
+    }
 }
+
