@@ -1,4 +1,4 @@
-# 🍳 SmartRecipe — Backend RESTful API & AI Microservices
+# 🍳 SmartRecipe Platform — Backend RESTful API & AI Microservices
 
 > **RESTful API Core Engine** cho nền tảng quản lý công thức nấu ăn, tủ nguyên liệu thông minh (Pantry Zero-Waste) và tối ưu hóa danh sách đi chợ. Tích hợp sâu **Google Gemini AI**, cơ chế quy đổi đơn vị theo đồ thị BFS, tự động trừ kho theo hạn dùng (FEFO) và hệ thống quản trị chuyên sâu (Admin Dashboard).
 
@@ -41,7 +41,7 @@
 
 ## 🎯 Tổng quan kiến trúc & Điểm nhấn
 
-SmartRecipe Backend đóng vai trò bộ não điều phối toàn bộ luồng dữ liệu, xử lý nghiệp vụ ẩm thực phức tạp:
+SmartRecipe Platform (Backend) đóng vai trò bộ não điều phối toàn bộ luồng dữ liệu, xử lý nghiệp vụ ẩm thực phức tạp:
 
 1. **Zero-Waste AI Engine:** Tích hợp mô hình `gemini-2.0-flash` / `gemini-3-flash-preview` đọc trạng thái thực tế của tủ lạnh, ưu tiên nguyên liệu cận date để sáng tạo công thức chống lãng phí kèm thông số dinh dưỡng chuẩn xác.
 2. **Quy đổi đơn vị & Trừ kho FEFO:** Chuẩn hóa mọi đơn vị dân gian (thìa, muỗng, chén, quả, bát) về đơn vị đo lường gốc (`g`, `ml`) bằng đồ thị đa bước BFS; tự động trừ các lô nguyên liệu hết hạn trước khi người dùng thực hiện nấu.
@@ -729,4 +729,9 @@ Hệ thống CI/CD tự động được thiết lập trong thư mục `.github
 
 ---
 
-*Phát triển bởi đội ngũ kỹ sư SmartRecipe — Spring Boot 4.1.0 & Java 21 LTS*
+<div align="center">
+
+**SmartRecipe Platform** — Nấu ăn thông minh, Tiết kiệm mỗi ngày 🍳  
+*Được xây dựng với niềm đam mê công nghệ và ẩm thực.*
+
+</div>
