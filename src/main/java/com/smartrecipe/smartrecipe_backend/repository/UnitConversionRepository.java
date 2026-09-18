@@ -14,9 +14,11 @@ public interface UnitConversionRepository extends JpaRepository<UnitConversion, 
 
     List<UnitConversion> findByIngredientIsNull();
 
-    Optional<UnitConversion> findByFromUnitAndToUnitAndIngredientId(String fromUnit, String toUnit, Long ingredientId);
+    Optional<UnitConversion> findFirstByFromUnitAndToUnitAndIngredientId(String fromUnit, String toUnit, Long ingredientId);
 
-    Optional<UnitConversion> findByFromUnitAndToUnitAndIngredientIsNull(String fromUnit, String toUnit);
+    Optional<UnitConversion> findFirstByFromUnitAndToUnitAndIngredientIsNull(String fromUnit, String toUnit);
+
+    boolean existsByFromUnitAndToUnitAndIngredientIsNull(String fromUnit, String toUnit);
 
     List<UnitConversion> findByIngredientIdOrIngredientIsNull(Long ingredientId);
 }

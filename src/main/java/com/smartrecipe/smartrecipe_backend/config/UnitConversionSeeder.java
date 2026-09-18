@@ -81,8 +81,7 @@ public class UnitConversionSeeder implements ApplicationRunner {
         int inserted = 0;
         for (GlobalRule rule : GLOBAL_RULES) {
             boolean exists = unitConversionRepository
-                    .findByFromUnitAndToUnitAndIngredientIsNull(rule.from(), rule.to())
-                    .isPresent();
+                    .existsByFromUnitAndToUnitAndIngredientIsNull(rule.from(), rule.to());
             if (!exists) {
                 unitConversionRepository.save(
                         UnitConversion.builder()
