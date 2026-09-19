@@ -5,6 +5,7 @@ import com.smartrecipe.smartrecipe_backend.enums.AiSuggestionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -45,4 +46,12 @@ public interface AiSuggestionLogRepository extends JpaRepository<AiSuggestionLog
 
     @Query("SELECT COUNT(a) FROM AiSuggestionLog a WHERE a.createdAt >= :startOfDay")
     long countTodayCalls(@Param("startOfDay") LocalDateTime startOfDay);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE AiSuggestionLog a SET a.savedRecipe = null WHERE a.savedRecipe.id IN :recipeIds")
+    void clearSavedRecipeByRecipeIds(@Param("recipeIds") List<Long> recipeIds);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM AiSuggestionLog a WHERE a.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

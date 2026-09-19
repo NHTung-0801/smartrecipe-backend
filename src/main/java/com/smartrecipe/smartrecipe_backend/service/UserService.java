@@ -11,4 +11,5 @@ public interface UserService {
     void changePassword(String username, ChangePasswordRequest request);
     UserProfileResponse updateAvatar(String username, org.springframework.web.multipart.MultipartFile file);
     void deleteAccount(String username, String password);
+    void deleteUserCascade(Long userId);
 }

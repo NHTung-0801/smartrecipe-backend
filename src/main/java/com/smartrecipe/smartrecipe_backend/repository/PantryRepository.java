@@ -3,6 +3,7 @@ package com.smartrecipe.smartrecipe_backend.repository;
 import com.smartrecipe.smartrecipe_backend.entity.UserPantry;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -50,4 +51,8 @@ public interface PantryRepository extends JpaRepository<UserPantry, Long> {
     /** Đếm số nguyên liệu sắp hết hạn hoặc đã hết hạn trên toàn hệ thống trước hoặc trong ngày targetDate. */
     @Query("SELECT COUNT(p) FROM UserPantry p WHERE p.expiryDate IS NOT NULL AND p.expiryDate <= :targetDate")
     long countExpiringSoon(@Param("targetDate") LocalDate targetDate);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM UserPantry p WHERE p.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

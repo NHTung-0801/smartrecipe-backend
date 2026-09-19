@@ -3,18 +3,19 @@ package com.smartrecipe.smartrecipe_backend.service.impl;
 import com.smartrecipe.smartrecipe_backend.dto.request.ChangePasswordRequest;
 import com.smartrecipe.smartrecipe_backend.dto.request.UpdateProfileRequest;
 import com.smartrecipe.smartrecipe_backend.dto.response.UserProfileResponse;
+import com.smartrecipe.smartrecipe_backend.entity.GroceryList;
 import com.smartrecipe.smartrecipe_backend.entity.User;
 import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
-import com.smartrecipe.smartrecipe_backend.repository.UserRepository;
-import com.smartrecipe.smartrecipe_backend.repository.FollowRepository;
-import com.smartrecipe.smartrecipe_backend.repository.RecipeRepository;
+import com.smartrecipe.smartrecipe_backend.repository.*;
 import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
 import com.smartrecipe.smartrecipe_backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,14 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
     private final RecipeRepository recipeRepository;
+    private final AiSuggestionLogRepository aiSuggestionLogRepository;
+    private final CookingJournalRepository cookingJournalRepository;
+    private final NotificationRepository notificationRepository;
+    private final RecipeLikeRepository recipeLikeRepository;
+    private final RecipeCommentRepository recipeCommentRepository;
+    private final PantryRepository pantryRepository;
+    private final GroceryListRepository groceryListRepository;
+    private final GroceryListRecipeRepository groceryListRecipeRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.smartrecipe.smartrecipe_backend.service.CloudinaryService cloudinaryService;
 
@@ -131,6 +140,75 @@ public class UserServiceImpl implements UserService {
             throw new BadRequestException("Mật khẩu không chính xác. Vui lòng nhập lại.");
         }
 
+        deleteUserCascade(user.getId());
+    }
+
+    @Override
+    @Transactional
+    public void deleteUserCascade(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // 1. Lấy danh sách ID công thức của user
+        List<Long> recipeIds = recipeRepository.findIdsByAuthorId(userId);
+
+        if (recipeIds != null && !recipeIds.isEmpty()) {
+            // 2. Gỡ liên kết clonedFrom của các công thức clone từ công thức của user này
+            recipeRepository.clearClonedFromByRecipeIds(recipeIds);
+
+            // 3. Gỡ liên kết savedRecipe trong nhật ký AI gợi ý
+            aiSuggestionLogRepository.clearSavedRecipeByRecipeIds(recipeIds);
+
+            // 4. Gỡ liên kết recipe trong nhật ký nấu ăn
+            cookingJournalRepository.clearRecipeByRecipeIds(recipeIds);
+
+            // 5. Xóa thông báo liên quan đến các công thức này
+            notificationRepository.deleteByRecipeIdIn(recipeIds);
+
+            // 5b. Xóa liên kết công thức trong danh sách đi chợ của bất kỳ user nào
+            groceryListRecipeRepository.deleteByRecipeIdIn(recipeIds);
+
+            // 5c. Gỡ liên kết parent của các bình luận thuộc các công thức này (tránh self-reference FK error)
+            recipeCommentRepository.clearParentByRecipeIds(recipeIds);
+
+            // 6. Xóa các công thức (JPA cascade xóa steps, ingredients, tags, likes, comments của công thức)
+            recipeRepository.deleteAllById(recipeIds);
+        }
+
+        // 7. Xóa toàn bộ thông báo mà user là người nhận (recipient) hoặc người thực hiện (actor)
+        notificationRepository.deleteByRecipientIdOrActorId(userId);
+
+        // 8. Xóa toàn bộ quan hệ follow (follower hoặc following)
+        followRepository.deleteByFollowerIdOrFollowingId(userId);
+
+        // 9a. Giảm likeCount của các công thức mà user này đã từng thả tim
+        recipeRepository.decrementLikeCountForUserLikes(userId);
+
+        // 9b. Xóa toàn bộ lượt thích của user này
+        recipeLikeRepository.deleteByUserId(userId);
+
+        // 10a. Gỡ liên kết parent của các bình luận con trỏ tới bình luận do user này viết
+        recipeCommentRepository.clearParentByUserId(userId);
+
+        // 10b. Xóa toàn bộ bình luận do user này viết trên các công thức khác
+        recipeCommentRepository.deleteByUserId(userId);
+
+        // 11. Xóa toàn bộ nhật ký nấu ăn của user
+        cookingJournalRepository.deleteByUserId(userId);
+
+        // 12. Xóa toàn bộ nhật ký gợi ý AI của user
+        aiSuggestionLogRepository.deleteByUserId(userId);
+
+        // 13. Xóa toàn bộ nguyên liệu trong tủ bếp của user
+        pantryRepository.deleteByUserId(userId);
+
+        // 14. Xóa toàn bộ danh sách đi chợ của user (JPA cascade xóa items và recipeSources)
+        List<GroceryList> userLists = groceryListRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (userLists != null && !userLists.isEmpty()) {
+            groceryListRepository.deleteAll(userLists);
+        }
+
+        // 15. Cuối cùng, xóa tài khoản người dùng
         userRepository.delete(user);
     }
 }

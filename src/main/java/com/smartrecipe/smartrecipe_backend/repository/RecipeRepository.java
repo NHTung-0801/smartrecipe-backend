@@ -6,6 +6,7 @@ import com.smartrecipe.smartrecipe_backend.enums.RecipeStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -76,4 +77,16 @@ public interface RecipeRepository extends JpaRepository<Recipe, Long> {
 
     @Query("SELECT COALESCE(SUM(r.likeCount), 0) FROM Recipe r WHERE r.author.id = :authorId AND r.status = com.smartrecipe.smartrecipe_backend.enums.RecipeStatus.PUBLIC")
     long sumLikeCountByAuthorId(@Param("authorId") Long authorId);
+
+    @Query("SELECT r.id FROM Recipe r WHERE r.author.id = :authorId")
+    List<Long> findIdsByAuthorId(@Param("authorId") Long authorId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Recipe r SET r.clonedFrom = null WHERE r.clonedFrom.id IN :recipeIds")
+    void clearClonedFromByRecipeIds(@Param("recipeIds") List<Long> recipeIds);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Recipe r SET r.likeCount = (CASE WHEN r.likeCount > 0 THEN r.likeCount - 1 ELSE 0 END) " +
+           "WHERE r.id IN (SELECT rl.recipe.id FROM RecipeLike rl WHERE rl.user.id = :userId)")
+    void decrementLikeCountForUserLikes(@Param("userId") Long userId);
 }

@@ -14,6 +14,7 @@ import com.smartrecipe.smartrecipe_backend.enums.Role;
 import com.smartrecipe.smartrecipe_backend.exception.BadRequestException;
 import com.smartrecipe.smartrecipe_backend.exception.ResourceNotFoundException;
 import com.smartrecipe.smartrecipe_backend.repository.*;
+import com.smartrecipe.smartrecipe_backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -45,6 +46,7 @@ public class AdminController {
     private final CookingJournalRepository cookingJournalRepository;
     private final AisleRepository aisleRepository;
     private final FollowRepository followRepository;
+    private final UserService userService;
     private final ObjectMapper objectMapper;
 
     // ==================== DASHBOARD STATS ====================
@@ -644,8 +646,8 @@ public class AdminController {
             throw new BadRequestException("Không thể xóa tài khoản Quản trị viên duy nhất trong hệ thống");
         }
 
-        userRepository.deleteById(id);
-        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa người dùng @" + u.getUsername()));
+        userService.deleteUserCascade(id);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa người dùng @" + u.getUsername() + " và toàn bộ dữ liệu liên quan"));
     }
 
     // ==================== AI LOGS MONITORING ====================

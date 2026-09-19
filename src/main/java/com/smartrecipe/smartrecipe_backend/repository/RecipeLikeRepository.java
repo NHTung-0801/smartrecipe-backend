@@ -2,6 +2,7 @@ package com.smartrecipe.smartrecipe_backend.repository;
 
 import com.smartrecipe.smartrecipe_backend.entity.RecipeLike;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,4 +23,8 @@ public interface RecipeLikeRepository extends JpaRepository<RecipeLike, Long> {
 
     @Query("SELECT rl.recipe.id FROM RecipeLike rl WHERE rl.user.id = :userId")
     List<Long> findLikedRecipeIdsByUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM RecipeLike rl WHERE rl.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }
