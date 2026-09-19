@@ -87,3 +87,13 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # Tắt kiểm tra Mail và Redis khỏi composite health check:
+    # - MailHealthIndicator kết nối smtp.gmail.com:587 — Render free tier sandbox chặn port này
+    #   làm /actuator/health trả về 503, khiến CD pipeline timeout sau 10 phút
+    # - RedisHealthIndicator cũng bị ảnh hưởng tương tự nếu Upstash chưa sẵn sàng
+    # Ứng dụng vẫn gửi mail và dùng Redis bình thường — chỉ bỏ health probe
+    mail:
+      enabled: false
+    redis:
+      enabled: false
